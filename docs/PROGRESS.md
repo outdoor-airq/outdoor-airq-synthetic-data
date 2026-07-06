@@ -7,3 +7,5 @@ Claude Code bu dosyaya sadece kullanıcı onayı sonrası satır ekler, sonra co
 <!-- örnek:
 - [2026-07-06] stage1: modüler mqtt subscriber + sqlalchemy modelleri, .env geçişi — onaylayan: kullanıcı
 -->
+
+- [2026-07-06] stage1: mqtt/ modüler subscriber yapısına geçirildi (db.py, models.py, handlers.py, consumer.py), publisher.py ve pg_setup.py .env'den okuyacak şekilde güncellendi — onaylayan: kullanıcı
