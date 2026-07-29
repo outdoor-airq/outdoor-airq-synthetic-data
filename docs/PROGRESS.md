@@ -49,3 +49,50 @@ Claude Code bu dosyaya sadece kullanıcı onayı sonrası satır ekler, sonra co
 - [2026-07-27 16:35] fix-nginx-resolver: `harun` dalından cherry-pick edildi (main'de bu sorun yoktu ama gerçek bir tuzak, faydalı bir fix). `stage_raw_sink` deploy'ında backend container'ı yeniden yaratılınca frontend 502 vermeye başladı ("connect() failed (111: Connection refused) ... upstream: http://172.18.0.7:8000"). Sebep nginx'in sabit hostname'li `proxy_pass http://backend:8000/` yazımını yalnızca açılışta bir kez DNS'ten çözüp önbelleğe alması: backend'in IP'si değişince frontend de restart edilmeden düzelmiyordu (yeni cihazda kurulum yapan herkesin karşılaşacağı bir tuzak). `frontend/nginx.conf`'ta hostname değişkene alındı (`set $backend_host backend;` + `resolver 127.0.0.11 valid=10s ipv6=off;` — Docker'ın gömülü DNS'i), böylece nginx her istekte yeniden çözüyor. `proxy_pass` değişken içerdiğinde eski yazımdaki sondaki slash'in yaptığı `/api/` → `/` kırpması otomatik uygulanmadığından `rewrite ^/api/(.*)$ /$1 break;` ile URI elle kırpıldı (upstream `/readings/latest` görmeli, `/api/readings/latest` değil). Doğrulama (harun tarafından, kendi dalında): ilk deneme yetersizdi (backend yeniden yaratılınca aynı IP'yi aldı), bu yüzden ağa geçici bir container konulup eski IP işgal edildi ve backend gerçekten farklı IP'ye taşındı (172.18.0.10 → 172.18.0.12); frontend hiç restart edilmeden `/api/readings/latest` üç ardışık denemede de HTTP 200 + 24 istasyon döndü, geçici container silindi — onaylayan: harun. main'e alınması: `hava-kalitesi-harun` worktree'sinde `docker compose up -d --build` ile tam stack ayağa kaldırılıp test edildi — backend, frontend, timescaledb, mosquitto, flink job'ları dahil 10/10 container sağlıklı; `/docs` 200, `/readings/latest` canlı WAQI verisi döndürdü, backend container'ı bilerek restart edilip frontend `/api` proxy'sinin 502 vermeden (200) devam ettiği doğrulandı — onaylayan: kullanıcı
 - [2026-07-28] fix-schema-composite-pk: `01_aqi_schema.sql`'de `aqi_window_aggregates` ve `aqi_anomalies` tabloları `id SERIAL PRIMARY KEY` ilan ettiği için fresh volume init'te `create_hypertable(...,'window_start')` / `(...,'detected_at')` "cannot create a unique index without the column ..." hatası veriyordu — madde 47'nin (fix-fresh-clone-recovery) kök nedeni. Kritik keşif: bu düzeltme aslında yalnızca `harun` dalında ve harun'un çalışma kopyasında vardı; main'in commit'li sürümü `d6fb495`→`88c9ab7` boyunca hâlâ bozuktu, yani madde 47'deki "repodaki SQL zaten düzeltilmişti" ifadesi main için geçerli değildi (çalışan DB yalnızca harun'un commit edilmemiş kopyasıyla init edildiği için ayakta kalmıştı). Her iki tablonun PK'si composite'e çevrildi: `PRIMARY KEY (id, window_start)` ve `(id, detected_at)` (partition kolonu PK'ye dahil). Çalışan DB etkilenmedi (init SQL yalnızca boş volume'da çalışır; doğrulama: çalışan DB'de `\d aqi_window_aggregates` → PK `(id, window_start)` + 2 child chunk); değişiklik yalnızca commit'li dosyayı çalışan DB'nin gerçeğiyle eşitleyip gelecekteki temiz kurulumları kurtarır — onaylayan: kullanıcı
 - [2026-07-28] fix-fresh-install-setup: Yeni cihazda kurulumu engelleyen üç eksik `harun` dalından `main`'e alındı (dosyalar kod tarafına dokunmuyor, yalnızca dokümantasyon ve build ayarı; iki dal artık bu üç dosyada birebir aynı). (1) Kök `.dockerignore`: `backend/Dockerfile` ve `mqtt/Dockerfile` build context olarak repo kökünü kullandığından, ilk `docker compose up` sonrası mosquitto container'ının uid 1883 + 0600 ile oluşturduğu `mosquitto/data/mosquitto.db` sonraki her build'i "checking context: no permission to read from ..." ile kırıyordu; dosya geçici kaldırılıp `docker compose build backend` çalıştırılarak hatanın gerçekten döndüğü, geri konulduğunda "Successfully built" verdiği doğrulandı (Linux'ta kesin, WSL/Windows'ta dosya sahipliği farklı çalıştığı için görülmez). (2) `.env.example`: `DB_PASSWORD` boştu ve postgres imajı boş şifreyle başlamayı reddediyor ("Database is uninitialized and superuser password is not specified" — izole container ile doğrulandı), `DB_USER=postgres` / `DB_NAME=airquality` ise compose'un gerçekte kullandığıyla uyumsuzdu (compose `POSTGRES_DB: aqi_db` sabit veriyor); `shared/db.py` ve `docker-compose.yml` okunarak compose'un bu dosyadan yalnızca `WAQI_TOKEN`/`DB_USER`/`DB_PASSWORD` okuduğu, diğerlerinin yalnızca host'tan script çalıştırırken (örn. `python -m mqtt.backfill_sim`) geçerli olduğu belgelendi. (3) `README.md`: gereksinimler, kurulum, doğrulama komutları, servis/port tablosu, "harita boşsa" adım adım teşhis, opsiyonel SİM backfill (artık zorunlu değil — canlı akış `raw_readings`'i besliyor), sık karşılaşılan sorunlar ve volume sıfırlama prosedürü; içindeki tüm komutlar main'in çalışan stack'i üzerinde test edildi (`docker compose ps` 10/10, `/stations`, `/api/readings/latest`, `/jobs/overview`, `psql` sayımları). Bu adımda ayrıca yerel kurulum main'in çözümüne geçirildi: eski AQI job cancel edilip `aqi-flink-job` ve `backend` main'in kodundan yeniden derlendi — Flink vertex'i `Sink: raw-readings-sink` olarak doğrulandı, backend 24/24 istasyonda `processed` bloğunu dolduruyor (`category` anlık hesaplanıyor, anomali `aqi_anomalies`'ten `EXISTS` ile geliyor, `algo_version: ema_v1`), backend yeniden yaratılmasına rağmen frontend'e dokunulmadan `/api` proxy'si 200 dönmeye devam etti (nginx `resolver` düzeltmesi çalışıyor) — onaylayan: harun
+
+* [2026-07-29] energy-01-worktree-migration: Adım 1 (hane popülasyonu üretimi) çalışması
+  main worktree'de (`~/hava-kalitesi-izleme`) sürdürülürken, başka bir terminalden main
+  branch'e demo hazırlığı amacıyla iki kez `git reset --hard origin/main` çalıştırıldı,
+  her ikisinde de commit'lenmemiş/push'lanmamış Aşama A-C dosyaları (Dockerfile, config/*.py,
+  docker-compose.yml eklentisi, kök requirements.txt) working tree'den silindi — kök neden,
+  iki terminalin aynı fiziksel checkout'u (worktree izolasyonu olmadan) paylaşması. Kayıp
+  her seferinde `git reflog` üzerinden dangling commit olarak kurtarıldı (son kurtarma:
+  `ce87d21`). Kalıcı çözüm: çalışma `git worktree add ../hava-kalitesi-izleme-yusuf yusuf`
+  ile main'den tamamen ayrı bir worktree'ye taşındı, `yusuf` branch'i `ce87d21`'den
+  türetildi. `data/tuik/` (TÜİK kaynak dosyaları, git'e commit'siz) sembolik link yerine
+  kopyalandı (WSL 9P dosya sisteminde symlink güvenilmez davrandı), 4 dosyanın MD5'i main
+  ile birebir doğrulandı. `data-generator-dev` container'ı main worktree'den indirilip
+  yusuf worktree'sinden yeniden ayağa kaldırıldı (docker-compose mount'ları göreli yol
+  olduğu için). Main branch etkilenmedi, temiz kaldı (origin/main = `9b75078`). Bundan
+  sonraki tüm Adım 1 çalışması `~/hava-kalitesi-izleme-yusuf`, `yusuf` branch'inde
+  yürütülecek — onaylayan: yusuf
+
+* [2026-07-29] energy-01-kentkir-join-fix: `adim-01-hane-populasyonu-prompt-v2.md`'nin
+  önerdiği KENT-KIR SINIFLAMASI join yöntemi (`KÖY KAYIT NO.notna()` ile köy/mahalle
+  ayrımı) `95.xlsx` üzerinde test edilince çalışmadığı görüldü — `KÖY KAYIT NO` sütunu
+  yerleşim tipinden bağımsız olarak TÜM satırlarda dolu (32.254/32.254 mahalle satırında
+  da dolu), gerçek bir köy kaydı değil, ayrım için kullanılamaz. Doğru anahtar
+  `BELEDİYE/KÖY` sütunu (`'BELEDİYE'`/`'KÖY'` değerleri) olduğu, üç bağımsız sinyalle
+  (KÖY ADI notna ⟺ MAHALLE KAYIT NO isna ⟺ BELEDİYE/KÖY=='KÖY') doğrulandı. Türkiye
+  geneli test: mahalle join eşleşmeme 0/32.254, köy join eşleşmeme 0/18.183
+  (`validate='1:1'` ile). `build_settlements.py` bu yönteme göre yazıldı,
+  prompt-v2 §3'e düzeltme notu eklendi — onaylayan: yusuf
+
+* [2026-07-29] energy-01-stage-d-progress: `load_tuik.py` yazıldı, iki bug bulunup
+  düzeltildi (_find_col substring eşleşmesi `Zaman`/`Zaman Formatı` ve
+  `Gözlem`/`Gözlem Durumu`/`Gözlem Sıklığı` çakışıyordu — tam eşleşme önceliği eklendi,
+  5 bilinen boş kolon okuma anında düşürülüyor). Test: Marmara nüfus = 26.710.046 ✓.
+  `build_settlements.py` yazıldı (KENT-KIR düzeltmesiyle): 6.370 satır, 0 eşleşmeme ✓.
+  `allocate_households.py` yazıldı: Σ hane = 8.529.528 ✓, 11 ilin ölçek değeri ±0,001
+  içinde (en büyük fark 0,0004), 11 ilin hane toplamı T06 ile tam eşit, 0-hane guard'ı
+  hiç tetiklenmedi (beklenen — TÜİK zaten ≤10 nüfuslu yerleşimleri listeden çıkarmış).
+  `assign_attributes.py`: λ değerleri 11 il için prompt-v2 §6.2 referans tablosuyla
+  ±5e-5 içinde eşleşti (prompt tablosu 4 ondalık yuvarlanmış olduğundan literal ±1e-6
+  anlamsızdı). Örnekleme + konut/ısıtma/çarpan/klima tamamlandı. AÇIK KARAR: doğrulama
+  #12 (il bazlı tip dağılımı ±0,001) küçük illerde (Bilecik, Kırklareli) örnekleme
+  gürültüsüyle marjinal başarısız oluyordu — tip payını deterministik apportion etmek
+  yerine (spec'in "ortak tablodan tek çekim" ilkesini bozacağı için) #12'nin toleransını
+  örneklem büyüklüğüne duyarlı yapmaya karar verildi:
+  `tolerans_il = max(0.001, 4 * sqrt(p_hat * (1 - p_hat) / n_il))`.
+  **Bu formül henüz validate.py'a eklenmedi** — sıradaki iş bu. Kalan: validate.py
+  (15 madde), report.py, generate_population.py, load_to_db.py — onaylayan: yusuf
