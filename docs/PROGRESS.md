@@ -113,3 +113,25 @@ Claude Code bu dosyaya sadece kullanıcı onayı sonrası satır ekler, sonra co
   tabloları gözle kontrol edildi, tutarlı bulundu. Kod değişikliği yapılmadı, yalnızca
   doğrulama/regresyon koşusu. Sıradaki iş: `generate_population.py` orkestratörü ve
   `load_to_db.py` — onaylayan: yusuf
+
+* [2026-07-30] energy-01-generate-population: `generate_population.py` orkestratörü
+  yazıldı — load_tuik → build_settlements → allocate_households → (ad kolonları için
+  il_adi/ilce_adi/belediye_adi/yerlesim_adi kategori sözlükleri yerleşim tablosundan
+  türetilip il yazımından önce sabitlendi) → il bazlı (IL_SIRASI sırasıyla, household_id
+  sırasıyla aynı) λ-eğilmiş örnekleme + konut/ısıtma/çarpan/klima ataması → pyarrow
+  ParquetWriter ile row-group row-group `households.parquet` yazımı. Yarım dosya riskine
+  karşı aynı dizinde `.tmp` uzantısıyla yazılıp tüm iller bitince `os.replace()` ile
+  atomik taşınıyor (kullanıcı onayıyla, ayrı bir tmp dizini değil — EXDEV riskini önlemek
+  için). Bug bulunup düzeltildi: nullable `UInt32` (`belediye_kayit_no`) üzerinde çıplak
+  `.to_numpy()` sessizce NaN float64'e dönüştürüyordu (spec'in tam uyardığı tuzak) —
+  `.astype(object).to_numpy()` ile pd.NA korunarak düzeltildi, dosyanın gerçek arrow
+  şemasında `uint32` olduğu doğrulandı (`dtype_backend='numpy_nullable'` ile okuma
+  testiyle). Tek koşu: 8.529.528 satır, 97.8 MB, tepe bellek 3.459,5 MB (<4GB hedefi ✓),
+  39,9 sn. Doğrulama #11 (seed tekrarlanabilirlik) kullanıcı onaylı yöntemle test edildi:
+  iki ayrı geçici `OUT_DIR`'a (`_repro_test_run1/2`) tam koşu çalıştırılıp
+  `validate.py::dogrula_seed_tekrarlanabilirlik` ile sha256 karşılaştırıldı — **GEÇTİ**
+  (birebir aynı hash), geçici dizinler try/finally içinde koşu sonucu ne olursa olsun
+  silindi. Koşu öncesi `df -h /data` ile disk alanı kontrol edildi (953GB boş, yeterli).
+  15/15 doğrulama maddesi artık gerçek anlamda tamamlandı. Sıradaki iş: `load_to_db.py`
+  (yeni `households_marmara` tablosu, `COPY FROM STDIN`, indeksler yükleme sonrası) —
+  onaylayan: yusuf
