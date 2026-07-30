@@ -135,3 +135,28 @@ Claude Code bu dosyaya sadece kullanıcı onayı sonrası satır ekler, sonra co
   15/15 doğrulama maddesi artık gerçek anlamda tamamlandı. Sıradaki iş: `load_to_db.py`
   (yeni `households_marmara` tablosu, `COPY FROM STDIN`, indeksler yükleme sonrası) —
   onaylayan: yusuf
+
+* [2026-07-30] energy-01-load-to-db: `load_to_db.py` yazıldı — `households.parquet`'i
+  `energy_demo` veritabanında yeni `households_marmara` tablosuna (mevcut 5 hanelik
+  `households` tablosuna dokunmadan) `COPY FROM STDIN` ile row-group row-group yükler.
+  Tabloda kasıtlı olarak PK/unique constraint yok (household_id benzersizliği
+  validate.py #10'da zaten doğrulandı); COPY sonrası 3 indeks oluşturuluyor:
+  `(il_kodu, ilce_kayit_no)`, `(dagitim_sirketi)` ve — kullanıcının ileride
+  elec_readings/gas_readings hypertable'larının household_id üzerinden join edeceğini
+  öngörerek eklettiği — `(household_id)`. `docker-compose.yml`'a yalnızca
+  `data-generator-dev` servisine DB env var'ları (`DB_HOST=timescaledb`,
+  `DB_NAME=energy_demo` vb.) eklendi, başka hiçbir servise dokunulmadı. Bug bulunup
+  düzeltildi: `generate_population.py`'daki ile birebir aynı tuzak —
+  `pyarrow.Table.to_pandas()` nullable `UInt32` (`belediye_kayit_no`, köylerde NULL)
+  kolonunu sessizce float64'e çeviriyordu, COPY'ye "1394.0" gibi geçersiz tam sayı
+  metni giderdi; `.astype('Int32')` ile düzeltildi. Kullanıcı isteğiyle yükleme sonrası
+  elle spot-check yapıldı: köy satırlarında `belediye_kayit_no IS NULL` sayısı (127.142)
+  köy satır sayısıyla birebir eşleşti, mahalle satırlarında gerçek tam sayı (örn. 52377,
+  ondalık yok) doğrulandı, `has_ac` hem `true` hem `false` doğru encode edilmiş NULL yok
+  — COPY'nin sessiz NULL/boolean encode hatası riski elenmiş oldu. Test: 8.529.528 satır
+  tam eşleşti, eski `households` tablosu dokunulmamış, 3 indeks oluştu, süre 102,3s
+  (COPY 80,4s). Test bu worktree'ye özel izole bir Docker volume'ünde (`hkiy_timescale_data`)
+  yapıldı, ana üretim ortamı etkilenmedi. Adım 1 (hane popülasyonu üretimi) artık uçtan
+  uca tamamlandı: load_tuik → build_settlements → allocate_households → assign_attributes
+  → validate.py (15/15) → report.py → generate_population.py → load_to_db.py —
+  onaylayan: yusuf
