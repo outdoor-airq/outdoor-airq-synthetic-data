@@ -96,3 +96,20 @@ Claude Code bu dosyaya sadece kullanıcı onayı sonrası satır ekler, sonra co
   `tolerans_il = max(0.001, 4 * sqrt(p_hat * (1 - p_hat) / n_il))`.
   **Bu formül henüz validate.py'a eklenmedi** — sıradaki iş bu. Kalan: validate.py
   (15 madde), report.py, generate_population.py, load_to_db.py — onaylayan: yusuf
+
+* [2026-07-30] energy-01-validate-report-verify: `~/hava-kalitesi-izleme-yusuf` (branch `yusuf`)
+  worktree'sinde load_tuik → build_settlements → allocate_households → assign_attributes →
+  validate.py zinciri uçtan uca yeniden çalıştırıldı (Docker Desktop'ın önceki oturumdan
+  kapalı kalması dışında bir sorun çıkmadı, container `docker compose -p hkiy up -d --build
+  data-generator-dev` ile yeniden ayağa kaldırıldı). validate.py'ın 15 maddelik tam seti
+  test edildi: 14/14 uygulanabilir madde GEÇTİ, #11 (parquet bit-tekrarlanabilirlik)
+  beklenen şekilde N/A (generate_population.py'ı bekliyor) — 0 KALDI. Önceki turda açık
+  bırakılan #12 (il bazlı tip dağılımı, örneklem-duyarlı tolerans `max(0.001,
+  4·sqrt(p̂(1-p̂)/n_il))`) dahil tüm maddeler doğrulandı; Bilecik/Kırklareli/Edirne'de daha
+  önce marjinal başarısız olan durum artık sorunsuz. Ardından report.py çalıştırıldı,
+  `/data/generated/population_report.md` üretildi (9927 byte) — il × dağıtım şirketi
+  tablosu (İstanbul AYEDAŞ+BEDAŞ=4.917.759, diğer 10 il tek şirkete bağlı, genel toplam
+  8.529.528 ile tam eşit), hane büyüklüğü dağılımı ve tip dağılımı (üretilen vs T06)
+  tabloları gözle kontrol edildi, tutarlı bulundu. Kod değişikliği yapılmadı, yalnızca
+  doğrulama/regresyon koşusu. Sıradaki iş: `generate_population.py` orkestratörü ve
+  `load_to_db.py` — onaylayan: yusuf
