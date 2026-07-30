@@ -52,3 +52,114 @@ Claude Code bu dosyaya sadece kullanıcı onayı sonrası satır ekler, sonra co
 - [2026-07-29] refactor-flink-dedup: İki Flink projesindeki tekrar temizlendi ve sink'lerdeki DDL kopyaları kaldırıldı. (1) `MqttSourceFunction` iki projede de 117 satırdı ve tek farkı bir yorum kelimesi ile `clientId` önekiydi; ayrıca iki `pom.xml` (isim değişkenleri normalize edilince birebir) ve iki `Dockerfile` de kopyaydı. Yeni `flink-common` modülü (`com.hkizleme.flink.mqtt`) + kök `pom.xml` (parent aggregator: ortak property'ler, flink-streaming-java/slf4j bağımlılıkları, compiler ve shade plugin'leri `pluginManagement`'te, `${main.class}` property'siyle) eklendi; job pom'ları 115 satırdan ~65 satıra indi ve yalnızca kendi `main.class`'ı + domain bağımlılıklarını bildiriyor. `clientId` öneki constructor parametresi yapıldı, böylece iki job broker loglarında hâlâ ayrı görünüyor (davranış değişmedi). Docker tarafı: modül dışı bir bağımlılık Docker context'inden erişilemediği için iki Flink servisinin build context'i repo köküne çekildi (`context: .` + `dockerfile: <modul>/Dockerfile`), Dockerfile'lar `mvn -pl <modul> -am` ile reaktör derlemesi yapıyor ve önce yalnızca pom'ları kopyalayıp bağımlılık katmanını koruyor (parent `<modules>` hepsini listelediği için derlenmeyen modülün pom'u da kopyalanmak zorunda). `.dockerignore`'dan `aqi-flink-job/` ve `flink-job/` çıkarıldı — kök context'e geçişle birlikte bu satırlar build'i kırardı; dosyaya bunu açıklayan bir DİKKAT notu eklendi. (2) Beş sink (`RawReadingsSink`, aqi+energy `WindowAggregateSink`, aqi+energy `AnomalySink`) `open()` içinde `CREATE TABLE IF NOT EXISTS` çalıştırıyordu ve bu DDL'ler `01_aqi_schema.sql`/`02_energy_schema.sql` ile birebir tekrar ediyordu (kod yorumları da "kept identical to" diyerek bunu kabul ediyordu). Bu sadece tekrar değil, aktif bir maskeleme riskiydi: bu oturumda init SQL `create_hypertable` hatasıyla kesildiğinde sink'ler `aqi_window_aggregates`/`aqi_anomalies`'i düz tablo olarak (hypertable dönüşümü olmadan) oluşturup init'in başarısızlığını sessizce gizlemişti — `\dt` tabloları gösteriyordu ama `timescaledb_information.hypertables` boştu. DDL'ler ve `CREATE_UNIQUE_INDEX_SQL` sink'lerden kaldırıldı, tek kaynak init SQL oldu; init SQL'deki artık geçersiz "kept identical to the CREATE_TABLE_SQL in ..." yorumları güncellendi. Doğrulama: `docker compose build aqi-flink-job flink-job` ikisi de başarılı; iki job cancel edilip yeniden submit edildi, ikisi de RUNNING; ortak source'un çalıştığı iki yönden kanıtlandı — energy job source vertex'i `write: 48` (publisher 10 sn'de bir yayınlıyor) ve AQI tarafında var olan bir ölçüm bilerek yeniden yayınlanıp source'un `write: 1` verdiği görüldü, `raw_readings` sayısı 116726'da sabit kaldı (yani sink hem kendi DDL'i olmadan init'in oluşturduğu tabloya yazabiliyor hem `ON CONFLICT DO NOTHING` dedup'ı tutuyor). Test mesajı `StationSink` üzerinden `stations` tablosundaki 8773'ü geçici olarak bozdu (isim "test"), WAQI'den gerçek değerler çekilerek geri düzeltildi (Selimiye, 41.003818/29.026914). Kod değişikliğiyle ilgisi olmayan ama bu sırada ortaya çıkan bulgu: `energy_demo.households` tablosu boş olduğu için `ElectricityReadingSink` her okumayı "Unknown household 'HANE_00X', skipping" diyerek atıyor ve `electricity_readings` 0 satır; sebebi `energy/load_households.py`'nin beklediği `db_households.csv`'nin repoda hiç bulunmaması (`data/sim` ile aynı sınıftan bir temiz-kurulum eksiği) — bu refactor'den önce de böyleydi, ayrıca ele alınmalı — onaylayan: harun
 - [2026-07-29] fix-rawpayload-households-cleanup: Kalan üç madde kapatıldı. (1) `raw_payload` regresyonu giderildi: `mqtt/CLAUDE.md` bu alanı açıkça koruma altına almasına rağmen ("ileride ham veriye tekrar bakabilmek için önemli"), subscriber Python'dan Java Flink job'a taşınırken sessizce düşürülmüştü — `RawReadingsSink` 13 kolon yazıyor, `station_name` ve `raw_payload` her satırda NULL kalıyordu. WAQI'nin gönderdiği ham JSON hiç saklanmadığı için parse mantığında sonradan bulunacak bir hata ya da bugün okunmayan bir WAQI alanı geçmişe dönük düzeltilemezdi. `AqiReading`'e `rawPayload` alanı, `AqiReadingParser`'a ham `raw` string'inin geçişi eklendi; sink'in INSERT'ü 15 kolona çıkarıldı (`?::jsonb` ile). (2) `energy_demo.households` boş olduğu için `ElectricityReadingSink` her okumayı "Unknown household 'HANE_00X', skipping" deyip atıyor ve `electricity_readings` 0 satırda kalıyordu; sebebi `energy/load_households.py`'nin beklediği `db_households.csv`'nin repoda hiç bulunmamasıydı (`data/sim` ile aynı sınıftan bir temiz-kurulum eksiği). `02_energy_schema.sql`'e `energy/publisher/publisher.py`'deki HOUSEHOLDS listesiyle birebir aynı 5 hanelik idempotent seed eklendi, böylece demo kutudan çıktığı gibi çalışıyor. Seed eklenince ortaya çıkan tuzak da kapatıldı: `load_households.py` `ON CONFLICT DO NOTHING` kullandığından gerçek CSV eldeyse seed satırlarını hiçbir zaman geçemez, sessizce yok sayılırdı — script `DO UPDATE SET` (upsert) yapacak şekilde değiştirildi, artık CSV seed'in boş bıraktığı zengin alanları dolduruyor (rowcount artık ekleme+güncelleme saydığı için çıktı metni de düzeltildi). (3) `docs/prompts/adim-01-hane-populasyonu-prompt.md:Zone.Identifier` (Windows NTFS alternate data stream artefaktı, `9b75078` ile yanlışlıkla commit'lenmiş) silindi, `.gitignore`'a `*:Zone.Identifier` eklendi. Doğrulama: seed çalışan DB'ye uygulanıp energy job yeniden başlatıldı (HouseholdLookup `open()`'da bir kez yükleniyor) — "Unknown household" uyarıları tamamen durdu ve `electricity_readings` 0'dan 458'e çıktı, 25 saniyede 46→79 artışı gözlendi; `gas_readings`'in 0 olması hata değil, publisher gazı yalnızca 07/08/13/19/20/21 saatlerinde üretiyor ve test 12:48'de yapıldı. `raw_payload` için var olmayan bir `measured_at` ile test mesajı gönderildi: `station_name=Selimiye`, `raw_payload` dolu ve JSONB olarak sorgulanabilir (`raw_payload->>'dominant'`='pm25', `->>'humidity'`='58'); test satırı sonra silindi, `raw_readings` 116726'da sabit kaldı ve `stations` tablosu bozulmadı. Bu doğrulama sırasında bir tuzak yeniden görüldü ve kayda geçiriliyor: `restart: on-failure` + `flink run` kombinasyonunda container'ın eski bir örneğinin submit ettiği job slot'u tutmaya devam ediyor, yeni container ikinci kopyayı submit edemeyip `NoResourceAvailableException` ile sonsuz döngüye giriyor ve cluster ESKİ jar'ı çalıştırmaya devam ediyor — ilk `raw_payload` testi bu yüzden NULL döndü, öksüz job cancel edilince yeni jar devreye girdi. Rebuild sonrası mutlaka eski job cancel edilmeli — onaylayan: harun
 - [2026-07-29] fix-flink-job-resubmit: Flink job deploy'unun sessizce eski kodu çalıştırmaya devam etmesi sorunu giderildi. Sorun: compose'daki `flink run` (attached) + `restart: on-failure` ikilisinde container yeniden yaratıldığında cluster'daki ESKİ job çalışmaya devam edip slot'u tutuyor, yeni container ikinci bir kopya submit etmeye çalışıp `NoResourceAvailableException: Could not acquire the minimum required resources` alıyor, exit ediyor ve restart politikası bunu sonsuza kadar tekrarlıyordu. Sonuç sinsiydi: `docker compose build` + `up -d` yapılmasına rağmen cluster eski jar'ı çalıştırmaya devam ediyordu ve dışarıdan her şey normal görünüyordu (job "RUNNING", container "restarting"). Bu tuzak oturum boyunca üç kez ısırdı; en somutu `raw_payload` doğrulamasının NULL dönmesiydi — jar açılıp içindeki INSERT'ün doğru olduğu görüldüğü hâlde, çalışan job container'dan eski (job 09:48:50, container 09:50:12) olduğu için eski kod çalışıyordu. Ayrıca oturumun başındaki TaskManager `OutOfMemoryError: Metaspace` çöküşünün mekanizması da buydu (durmadan yeniden submit → sürekli class yükleme). Çözüm: ortak `flink-common/submit-job.sh` eklendi (iki job da aynı script'i kullanıyor, argüman olarak ana sınıf/jar/job adı alıyor). Script önce bağımlılıkları bekliyor (TimescaleDB ve JobManager TCP portu — `a8d9b4d`'deki hazır-olma beklemesi buraya taşındı), sonra `flink list -r` çıktısından aynı ada sahip çalışan job'ları bulup `flink cancel` ile iptal ediyor, ardından submit ediyor; böylece deploy idempotent oluyor. Ad eşleşmesi `" : <ad> ("` sınırlarıyla yapılıyor ki bir job adı diğerini kapsıyorsa yanlış job iptal edilmesin; `grep` hiçbir şey bulamayınca `set -e` altında pipeline'ı düşürmemesi için `|| true` kullanıldı. Job'lar checkpoint'li olmadığından (MqttSourceFunction "at-least-effort") iptal/yeniden başlatmada kaybedilen kalıcı durum yok. `docker-compose.yml`'deki iki uzun `bash -c` bloğu tek satırlık `command` dizisine indi, Dockerfile'lar script'i `/app/submit-job.sh` olarak kopyalıyor. Doğrulama: elle hiçbir iptal yapılmadan `docker compose up -d --force-recreate` iki kez çalıştırıldı; her ikisinde de script eski job'ı bulup iptal etti ve yeni job submit edildi (job ID'leri `ee596bdbe631`/`7efd914ba6de` → `a0355e2215ca`/`45f40b61fc45` → `672a9af70749`/`99212260df20` olarak değişti), container'lar restart döngüsüne girmedi, `slots-available: 0 / jobs-running: 2` dengede kaldı. Sonrasında veri akışının bozulmadığı doğrulandı: `electricity_readings` 1281→1298 artmaya devam etti, son 1 dakikada 0 "Unknown household" uyarısı, dashboard 24 istasyon, 10/10 servis ayakta — onaylayan: harun
+
+* [2026-07-29] energy-01-worktree-migration: Adım 1 (hane popülasyonu üretimi) çalışması
+  main worktree'de (`~/hava-kalitesi-izleme`) sürdürülürken, başka bir terminalden main
+  branch'e demo hazırlığı amacıyla iki kez `git reset --hard origin/main` çalıştırıldı,
+  her ikisinde de commit'lenmemiş/push'lanmamış Aşama A-C dosyaları (Dockerfile, config/*.py,
+  docker-compose.yml eklentisi, kök requirements.txt) working tree'den silindi — kök neden,
+  iki terminalin aynı fiziksel checkout'u (worktree izolasyonu olmadan) paylaşması. Kayıp
+  her seferinde `git reflog` üzerinden dangling commit olarak kurtarıldı (son kurtarma:
+  `ce87d21`). Kalıcı çözüm: çalışma `git worktree add ../hava-kalitesi-izleme-yusuf yusuf`
+  ile main'den tamamen ayrı bir worktree'ye taşındı, `yusuf` branch'i `ce87d21`'den
+  türetildi. `data/tuik/` (TÜİK kaynak dosyaları, git'e commit'siz) sembolik link yerine
+  kopyalandı (WSL 9P dosya sisteminde symlink güvenilmez davrandı), 4 dosyanın MD5'i main
+  ile birebir doğrulandı. `data-generator-dev` container'ı main worktree'den indirilip
+  yusuf worktree'sinden yeniden ayağa kaldırıldı (docker-compose mount'ları göreli yol
+  olduğu için). Main branch etkilenmedi, temiz kaldı (origin/main = `9b75078`). Bundan
+  sonraki tüm Adım 1 çalışması `~/hava-kalitesi-izleme-yusuf`, `yusuf` branch'inde
+  yürütülecek — onaylayan: yusuf
+
+* [2026-07-29] energy-01-kentkir-join-fix: `adim-01-hane-populasyonu-prompt-v2.md`'nin
+  önerdiği KENT-KIR SINIFLAMASI join yöntemi (`KÖY KAYIT NO.notna()` ile köy/mahalle
+  ayrımı) `95.xlsx` üzerinde test edilince çalışmadığı görüldü — `KÖY KAYIT NO` sütunu
+  yerleşim tipinden bağımsız olarak TÜM satırlarda dolu (32.254/32.254 mahalle satırında
+  da dolu), gerçek bir köy kaydı değil, ayrım için kullanılamaz. Doğru anahtar
+  `BELEDİYE/KÖY` sütunu (`'BELEDİYE'`/`'KÖY'` değerleri) olduğu, üç bağımsız sinyalle
+  (KÖY ADI notna ⟺ MAHALLE KAYIT NO isna ⟺ BELEDİYE/KÖY=='KÖY') doğrulandı. Türkiye
+  geneli test: mahalle join eşleşmeme 0/32.254, köy join eşleşmeme 0/18.183
+  (`validate='1:1'` ile). `build_settlements.py` bu yönteme göre yazıldı,
+  prompt-v2 §3'e düzeltme notu eklendi — onaylayan: yusuf
+
+* [2026-07-29] energy-01-stage-d-progress: `load_tuik.py` yazıldı, iki bug bulunup
+  düzeltildi (_find_col substring eşleşmesi `Zaman`/`Zaman Formatı` ve
+  `Gözlem`/`Gözlem Durumu`/`Gözlem Sıklığı` çakışıyordu — tam eşleşme önceliği eklendi,
+  5 bilinen boş kolon okuma anında düşürülüyor). Test: Marmara nüfus = 26.710.046 ✓.
+  `build_settlements.py` yazıldı (KENT-KIR düzeltmesiyle): 6.370 satır, 0 eşleşmeme ✓.
+  `allocate_households.py` yazıldı: Σ hane = 8.529.528 ✓, 11 ilin ölçek değeri ±0,001
+  içinde (en büyük fark 0,0004), 11 ilin hane toplamı T06 ile tam eşit, 0-hane guard'ı
+  hiç tetiklenmedi (beklenen — TÜİK zaten ≤10 nüfuslu yerleşimleri listeden çıkarmış).
+  `assign_attributes.py`: λ değerleri 11 il için prompt-v2 §6.2 referans tablosuyla
+  ±5e-5 içinde eşleşti (prompt tablosu 4 ondalık yuvarlanmış olduğundan literal ±1e-6
+  anlamsızdı). Örnekleme + konut/ısıtma/çarpan/klima tamamlandı. AÇIK KARAR: doğrulama
+  #12 (il bazlı tip dağılımı ±0,001) küçük illerde (Bilecik, Kırklareli) örnekleme
+  gürültüsüyle marjinal başarısız oluyordu — tip payını deterministik apportion etmek
+  yerine (spec'in "ortak tablodan tek çekim" ilkesini bozacağı için) #12'nin toleransını
+  örneklem büyüklüğüne duyarlı yapmaya karar verildi:
+  `tolerans_il = max(0.001, 4 * sqrt(p_hat * (1 - p_hat) / n_il))`.
+  **Bu formül henüz validate.py'a eklenmedi** — sıradaki iş bu. Kalan: validate.py
+  (15 madde), report.py, generate_population.py, load_to_db.py — onaylayan: yusuf
+
+* [2026-07-30] energy-01-validate-report-verify: `~/hava-kalitesi-izleme-yusuf` (branch `yusuf`)
+  worktree'sinde load_tuik → build_settlements → allocate_households → assign_attributes →
+  validate.py zinciri uçtan uca yeniden çalıştırıldı (Docker Desktop'ın önceki oturumdan
+  kapalı kalması dışında bir sorun çıkmadı, container `docker compose -p hkiy up -d --build
+  data-generator-dev` ile yeniden ayağa kaldırıldı). validate.py'ın 15 maddelik tam seti
+  test edildi: 14/14 uygulanabilir madde GEÇTİ, #11 (parquet bit-tekrarlanabilirlik)
+  beklenen şekilde N/A (generate_population.py'ı bekliyor) — 0 KALDI. Önceki turda açık
+  bırakılan #12 (il bazlı tip dağılımı, örneklem-duyarlı tolerans `max(0.001,
+  4·sqrt(p̂(1-p̂)/n_il))`) dahil tüm maddeler doğrulandı; Bilecik/Kırklareli/Edirne'de daha
+  önce marjinal başarısız olan durum artık sorunsuz. Ardından report.py çalıştırıldı,
+  `/data/generated/population_report.md` üretildi (9927 byte) — il × dağıtım şirketi
+  tablosu (İstanbul AYEDAŞ+BEDAŞ=4.917.759, diğer 10 il tek şirkete bağlı, genel toplam
+  8.529.528 ile tam eşit), hane büyüklüğü dağılımı ve tip dağılımı (üretilen vs T06)
+  tabloları gözle kontrol edildi, tutarlı bulundu. Kod değişikliği yapılmadı, yalnızca
+  doğrulama/regresyon koşusu. Sıradaki iş: `generate_population.py` orkestratörü ve
+  `load_to_db.py` — onaylayan: yusuf
+
+* [2026-07-30] energy-01-generate-population: `generate_population.py` orkestratörü
+  yazıldı — load_tuik → build_settlements → allocate_households → (ad kolonları için
+  il_adi/ilce_adi/belediye_adi/yerlesim_adi kategori sözlükleri yerleşim tablosundan
+  türetilip il yazımından önce sabitlendi) → il bazlı (IL_SIRASI sırasıyla, household_id
+  sırasıyla aynı) λ-eğilmiş örnekleme + konut/ısıtma/çarpan/klima ataması → pyarrow
+  ParquetWriter ile row-group row-group `households.parquet` yazımı. Yarım dosya riskine
+  karşı aynı dizinde `.tmp` uzantısıyla yazılıp tüm iller bitince `os.replace()` ile
+  atomik taşınıyor (kullanıcı onayıyla, ayrı bir tmp dizini değil — EXDEV riskini önlemek
+  için). Bug bulunup düzeltildi: nullable `UInt32` (`belediye_kayit_no`) üzerinde çıplak
+  `.to_numpy()` sessizce NaN float64'e dönüştürüyordu (spec'in tam uyardığı tuzak) —
+  `.astype(object).to_numpy()` ile pd.NA korunarak düzeltildi, dosyanın gerçek arrow
+  şemasında `uint32` olduğu doğrulandı (`dtype_backend='numpy_nullable'` ile okuma
+  testiyle). Tek koşu: 8.529.528 satır, 97.8 MB, tepe bellek 3.459,5 MB (<4GB hedefi ✓),
+  39,9 sn. Doğrulama #11 (seed tekrarlanabilirlik) kullanıcı onaylı yöntemle test edildi:
+  iki ayrı geçici `OUT_DIR`'a (`_repro_test_run1/2`) tam koşu çalıştırılıp
+  `validate.py::dogrula_seed_tekrarlanabilirlik` ile sha256 karşılaştırıldı — **GEÇTİ**
+  (birebir aynı hash), geçici dizinler try/finally içinde koşu sonucu ne olursa olsun
+  silindi. Koşu öncesi `df -h /data` ile disk alanı kontrol edildi (953GB boş, yeterli).
+  15/15 doğrulama maddesi artık gerçek anlamda tamamlandı. Sıradaki iş: `load_to_db.py`
+  (yeni `households_marmara` tablosu, `COPY FROM STDIN`, indeksler yükleme sonrası) —
+  onaylayan: yusuf
+
+* [2026-07-30] energy-01-load-to-db: `load_to_db.py` yazıldı — `households.parquet`'i
+  `energy_demo` veritabanında yeni `households_marmara` tablosuna (mevcut 5 hanelik
+  `households` tablosuna dokunmadan) `COPY FROM STDIN` ile row-group row-group yükler.
+  Tabloda kasıtlı olarak PK/unique constraint yok (household_id benzersizliği
+  validate.py #10'da zaten doğrulandı); COPY sonrası 3 indeks oluşturuluyor:
+  `(il_kodu, ilce_kayit_no)`, `(dagitim_sirketi)` ve — kullanıcının ileride
+  elec_readings/gas_readings hypertable'larının household_id üzerinden join edeceğini
+  öngörerek eklettiği — `(household_id)`. `docker-compose.yml`'a yalnızca
+  `data-generator-dev` servisine DB env var'ları (`DB_HOST=timescaledb`,
+  `DB_NAME=energy_demo` vb.) eklendi, başka hiçbir servise dokunulmadı. Bug bulunup
+  düzeltildi: `generate_population.py`'daki ile birebir aynı tuzak —
+  `pyarrow.Table.to_pandas()` nullable `UInt32` (`belediye_kayit_no`, köylerde NULL)
+  kolonunu sessizce float64'e çeviriyordu, COPY'ye "1394.0" gibi geçersiz tam sayı
+  metni giderdi; `.astype('Int32')` ile düzeltildi. Kullanıcı isteğiyle yükleme sonrası
+  elle spot-check yapıldı: köy satırlarında `belediye_kayit_no IS NULL` sayısı (127.142)
+  köy satır sayısıyla birebir eşleşti, mahalle satırlarında gerçek tam sayı (örn. 52377,
+  ondalık yok) doğrulandı, `has_ac` hem `true` hem `false` doğru encode edilmiş NULL yok
+  — COPY'nin sessiz NULL/boolean encode hatası riski elenmiş oldu. Test: 8.529.528 satır
+  tam eşleşti, eski `households` tablosu dokunulmamış, 3 indeks oluştu, süre 102,3s
+  (COPY 80,4s). Test bu worktree'ye özel izole bir Docker volume'ünde (`hkiy_timescale_data`)
+  yapıldı, ana üretim ortamı etkilenmedi. Adım 1 (hane popülasyonu üretimi) artık uçtan
+  uca tamamlandı: load_tuik → build_settlements → allocate_households → assign_attributes
+  → validate.py (15/15) → report.py → generate_population.py → load_to_db.py —
+  onaylayan: yusuf
