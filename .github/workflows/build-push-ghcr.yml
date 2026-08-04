@@ -1,0 +1,89 @@
+name: Build & Push to GHCR (synthetic-data)
+
+on:
+  push:
+    branches: [main]
+    paths:                          # yalnız image'a giren şeyler değişince derle (docs/plan/PROGRESS tetiklemesin)
+      - 'src/**'
+      - 'config/**'
+      - '*.py'
+      - 'requirements.txt'
+      - 'Dockerfile'
+      - '.dockerignore'             # build context'ini degistirir
+      # Dockerfile bu dosyalari image icine /data/tuik'e kopyaliyor (kod mutlak yoldan
+      # okuyor, prod'da volume yok). Girdi degisirse image ciktisi da degisir -> rebuild sart.
+      - 'data/tuik/**'
+  workflow_dispatch: {}             # elle tam yeniden derleme (deploy TETİKLEMEZ, sadece image tazeler)
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: ghcr-${{ github.ref }}
+  cancel-in-progress: false         # süren bir deploy zincirini yarıda kesme
+
+jobs:
+  # Tek servili repo: core'daki changes+matrix'e gerek yok, doğrudan build.
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: GHCR login
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}   # packages:write yeter, ayrı PAT gerekmez
+
+      - name: Etiketler — immutable, TAM SHA (latest YOK)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/outdoor-airq/synthetic-data
+          tags: |
+            type=sha,prefix=,format=long     # tag = tam 40-hane github.sha (infra .env ile birebir)
+
+      - name: Build + push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha,scope=synthetic-data
+          cache-to: type=gha,scope=synthetic-data,mode=max
+
+      - name: PAT var mı?
+        id: pat
+        if: github.event_name == 'push'          # elle rebuild deploy tetiklemesin
+        env:
+          PAT: ${{ secrets.INFRA_REPO_PAT }}
+        run: |
+          if [ -n "$PAT" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::INFRA_REPO_PAT tanımlı değil — infra tetiklenmedi. Image GHCR'de hazır, elle rollout edilebilir."
+          fi
+
+      - name: infra'ya deploy sinyali
+        if: steps.pat.outputs.present == 'true'
+        env:
+          PAT: ${{ secrets.INFRA_REPO_PAT }}      # cross-repo dispatch → GITHUB_TOKEN yetmez
+        run: |
+          # Alan adı "services" (çoğul): infra deploy.yml boşlukla ayrılmış liste okuyup
+          # döngüye sokuyor. "service" gönderilirse orada boş kalır, deploy sessizce
+          # "payload eksik" dalına düşüp SHA'yı güncellemeden pull+up yapar.
+          curl -fsS -X POST \
+            -H "Authorization: Bearer $PAT" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository_owner }}/outdoor-airq-infra/dispatches" \
+            -d "$(jq -nc --arg sha "${{ github.sha }}" \
+                  '{event_type:"synthetic-data-image-updated",client_payload:{sha:$sha,services:"synthetic-data"}}')"

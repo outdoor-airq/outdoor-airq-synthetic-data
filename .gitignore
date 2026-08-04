@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Uretim ciktisi (8.5M hane) - repoya girmez, calistirinca yeniden uretilir.
+# data/tuik/ ise BILEREK commit'li: girdi kaynagi, uretimi tekrarlanabilir kiliyor.
+data/generated/
+
+.env
