@@ -3,9 +3,13 @@
 TÜİK verisinden Marmara Bölgesi için sentetik hane popülasyonu üretir — **8.529.528 hane**, her biri
 yerleşim, hane tipi, büyüklük, konut tipi, ısıtma tipi ve klima bilgisiyle.
 
-Çıktı, enerji tüketimi simülasyonunun girdisidir: `energy_demo` veritabanındaki `households_marmara`
-tablosuna yüklenir ve [`outdoor-airq-core`](https://github.com/outdoor-airq/outdoor-airq-core)
-içindeki enerji pipeline'ı bunu kullanır.
+Çıktı `energy_demo` veritabanındaki `households_marmara` tablosuna yüklenir.
+
+> **Entegrasyon henüz yapılmadı.** [`outdoor-airq-core`](https://github.com/outdoor-airq/outdoor-airq-core)
+> içindeki `energy/publisher/publisher.py` şu an hâlâ elle yazılmış 5 hanelik demo listesini
+> (`HOUSEHOLDS`) kullanıyor ve enerji şemasındaki foreign key'ler eski `households` tablosuna bakıyor.
+> `households_marmara`'yı tüketmek planlanan durum, mevcut durum değil — bu tablo şimdilik ayrı
+> duruyor ve `households`'a dokunmuyor.
 
 Bu bir **batch** iştir; sürekli çalışmaz, gerektiğinde bir kez koşturulur.
 
@@ -15,13 +19,13 @@ Bu bir **batch** iştir; sürekli çalışmaz, gerektiğinde bir kez koşturulur
 docker build -t synthetic-data .
 
 # 1) Üretim: households.parquet (~98 MB, ~22 sn)
-docker run --rm -v synth_out:/data/generated synthetic-data
+docker run --rm -v synthetic_data_out:/data/generated synthetic-data
 
 # 2) Doğrulama: 15 tutarlılık kontrolü
-docker run --rm -v synth_out:/data/generated synthetic-data -m src.validate
+docker run --rm -v synthetic_data_out:/data/generated synthetic-data -m src.validate
 
 # 3) DB'ye yükleme
-docker run --rm -v synth_out:/data/generated --network <core-agi> \
+docker run --rm -v synthetic_data_out:/data/generated --network <core-agi> \
   -e DB_HOST=timescaledb -e DB_NAME=energy_demo \
   -e DB_USER=<kullanici> -e DB_PASSWORD=<sifre> \
   synthetic-data load_to_db.py
@@ -85,8 +89,9 @@ RNG üretir. Aynı girdiyle aynı çıktı gelir — bu bilinçli, çünkü doğ
 dayanıyor. Tohumlamayı değiştirirsen `src/validate.py` beklentileri de değişir.
 
 **2. Tepe bellek ~3.5 GB.** Üretim il il yapılır ve her il kendi parquet row-group'u olarak yazılıp
-bellekten düşürülür; buna rağmen ölçülen `ru_maxrss` 3.5 GB. Sunucu boyutlandırırken hesaba katılmalı
-(bkz. infra issue #4). Canlı pipeline ile aynı anda çalıştırılmamalı.
+bellekten düşürülür; buna rağmen ölçülen `ru_maxrss` 3.5 GB. Sunucu boyutlandırırken hesaba katılmalı —
+bkz. [infra#4 VPS boyutlandırma](https://github.com/outdoor-airq/outdoor-airq-infra/issues/4).
+Canlı pipeline ile aynı anda çalıştırılmamalı.
 
 **3. Yarım parquet diskte kalmaz.** Dosya önce `.tmp` uzantısıyla yazılır, tüm iller bitince
 `os.replace()` ile atomik olarak asıl adına taşınır. Üretim ortasında patlarsa `.tmp` silinir.
