@@ -25,7 +25,7 @@ docker run --rm -v synthetic_data_out:/data/generated synthetic-data
 docker run --rm -v synthetic_data_out:/data/generated synthetic-data -m src.validate
 
 # 3) DB'ye yükleme
-docker run --rm -v synthetic_data_out:/data/generated --network <core-agi> \
+docker run --rm -v synthetic_data_out:/data/generated --network outdoor-airq-network \
   -e DB_HOST=timescaledb -e DB_NAME=energy_demo \
   -e DB_USER=<kullanici> -e DB_PASSWORD=<sifre> \
   synthetic-data load_to_db.py
@@ -37,8 +37,9 @@ meselesi — yukarıdaki `-m src.validate` ve `load_to_db.py` bu şekilde çalı
 > **Volume neden gerekli:** üretim ve yükleme ayrı `docker run` adımları. Parquet konteynerin içinde
 > kalırsa ikinci adım onu bulamaz. Aynı volume'ü ikisine de bağlamak şart.
 
-> **Ağ:** 3. adım `<core-agi>` yerine core'un compose ağını ister — varsayılan kurulumda
-> `outdoor-airq-core_aqi-network`. `docker network ls` ile doğrulayabilirsin.
+> **Ağ:** 3. adım `outdoor-airq-network` ağına bağlanır — bu, `outdoor-airq-core`'un dev compose'unun
+> ağıdır ve orada `networks.aqi-network.name` ile **sabitlenmiştir**, yani core'u hangi klasör adıyla
+> klonladığın önemli değil. Önce core ayakta olmalı (`docker compose up -d`), yoksa ağ bulunamaz.
 
 ## Girdi verisi
 
