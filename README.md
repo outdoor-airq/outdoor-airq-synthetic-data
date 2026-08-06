@@ -41,6 +41,35 @@ meselesi — yukarıdaki `-m src.validate` ve `load_to_db.py` bu şekilde çalı
 > ağıdır ve orada `networks.aqi-network.name` ile **sabitlenmiştir**, yani core'u hangi klasör adıyla
 > klonladığın önemli değil. Önce core ayakta olmalı (`docker compose up -d`), yoksa ağ bulunamaz.
 
+## Yerel geliştirme
+
+`docker-compose.dev.yml`, yukarıdaki 3 adımı elle `docker run` ile birer birer çalıştırmak yerine,
+`outdoor-airq-core`'un çalışan dev ortamına doğrudan bağlanan tek bir `data-generator-dev` servisi
+sağlar:
+
+```bash
+# Önce outdoor-airq-core ayakta olmalı (aynı outdoor-airq-network ağını paylaşıyorlar)
+cp .env.example .env   # core/.env'deki DB_USER/DB_PASSWORD ile aynı değerleri gir
+
+docker compose -f docker-compose.dev.yml up -d --build
+docker compose -f docker-compose.dev.yml exec data-generator-dev bash
+```
+
+Container `tail -f /dev/null` ile boşta bekler — image'ın `ENTRYPOINT`'i `python` olduğu için düz bir
+`command:` override'ı işe yaramaz, bu yüzden `entrypoint:` override edildi. İçeri girip elle
+`python generate_population.py`, `python -m src.validate`, `python load_to_db.py` çalıştırabilirsin.
+
+> **Prod compose ile farkı:** Bu dosya, `outdoor-airq-core`'un `outdoor-airq-network` ağına
+> `external: true` ile bağlanan tek bir dev/debug servisi sağlar. Prod tarafında ayrı bir
+> "synthetic-data" compose servisi yok — üretim tek seferlik, `outdoor-airq-infra`'da elle/CI'dan
+> tetiklenen bir adım (`synthetic_data_out` volume'ü bunun için ayrılmış).
+
+> **`households.parquet` zaten var mı, önce kontrol et.** Üretim deterministiktir (`config/seed.py`),
+> aynı TÜİK girdisiyle her zaman aynı çıktıyı verir. Elinde geçerli bir parquet varsa (aynı
+> `data/tuik/` içeriği ve aynı `config/`/`src/` koduyla üretilmiş), `generate_population.py`'ı tekrar
+> çalıştırmak yerine dosyayı `data/generated/households.parquet`'e kopyalayıp doğrudan
+> `python load_to_db.py` çalıştırmak ~3.5 GB RAM ve birkaç dakika tasarruf ettirir.
+
 ## Girdi verisi
 
 TÜİK dosyaları **repoda commit'li** (`data/tuik/`, ~7.6 MB) ve Docker image'ının içine gömülüyor.

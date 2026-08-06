@@ -1,0 +1,19 @@
+networks:
+  outdoor-airq-network:
+    external: true
+
+services:
+  data-generator-dev:
+    build:
+      context: .
+    entrypoint: ["tail", "-f", "/dev/null"]
+    volumes:
+      - ./data/generated:/data/generated
+    environment:
+      DB_HOST: timescaledb
+      DB_PORT: "5432"
+      DB_NAME: energy_demo
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+    networks:
+      - outdoor-airq-network
