@@ -9,3 +9,7 @@ data/generated/
 
 .env
 .envrc.local
+
+# Claude Code oturum artifaktlari. Ozellikle .claude/worktrees/ altinda tam bir git
+# worktree durabiliyor; `git add -A` ile yanlislikla commit'e girmesin.
+.claude/
