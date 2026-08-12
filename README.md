@@ -70,6 +70,19 @@ Container `tail -f /dev/null` ile boşta bekler — image'ın `ENTRYPOINT`'i `py
 > çalıştırmak yerine dosyayı `data/generated/households.parquet`'e kopyalayıp doğrudan
 > `python load_to_db.py` çalıştırmak ~3.5 GB RAM ve birkaç dakika tasarruf ettirir.
 
+> **`down -v` sonrası geri yükleme.** `households_marmara` git'te değil; core'un `timescale_data`
+> Docker volume'ünde yaşayan çalışma zamanı verisidir. Restart ve reboot onu silmez — yalnızca
+> `docker compose down -v` (veya `docker volume rm`) siler. Volume sıfırlandıysa sıra şu:
+> parquet'in `data/generated/` içinde olduğundan emin ol, sonra `python load_to_db.py` çalıştır
+> (~112 sn, 8.529.528 satır, COPY sonrası 3 indeks). Parquet yoksa `generate_population.py` onu
+> deterministik olarak (`config/seed.py`, `SEED = 20260727`) yeniden üretir — yani veri hiçbir
+> koşulda kalıcı olarak kaybolmaz, en fazla yeniden üretilir.
+>
+> Tablo için `outdoor-airq-core/timescaledb/init/` altında bir şema dosyası ARAMA, eklemeyi de
+> önerme: DDL'in tek sahibi `load_to_db.py`'dir (`CREATE_TABLE_SQL` + yükleme sonrası 3 indeks).
+> Init'e ikinci bir kopya koymak iki ayrı DDL kaynağı yaratır (drift riski) ve `down -v` sonrası
+> yalnızca BOŞ bir tablo geri getirir — bu da "veri var" yanılgısına yol açar.
+
 ## Girdi verisi
 
 TÜİK dosyaları **repoda commit'li** (`data/tuik/`, ~7.6 MB) ve Docker image'ının içine gömülüyor.
