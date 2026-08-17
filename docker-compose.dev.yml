@@ -15,5 +15,7 @@ services:
       DB_NAME: energy_demo
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
+      EPTR_USERNAME: ${EPTR_USERNAME}
+      EPTR_PASSWORD: ${EPTR_PASSWORD}
     networks:
       - outdoor-airq-network
