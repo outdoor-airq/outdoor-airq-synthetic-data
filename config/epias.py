@@ -83,6 +83,11 @@ _RAW_HOURLY_SHAPE_WEEKDAY = np.array([
 ])
 HOURLY_SHAPE_WEEKDAY = _RAW_HOURLY_SHAPE_WEEKDAY / _RAW_HOURLY_SHAPE_WEEKDAY.mean()
 
+# Hafta sonu YALNIZ şekli düzleştirir, günlük toplamı değiştirmez — iki dizi de kendi 24
+# saatinde ortalama 1.0'a normalize edildiği için her gün 24.0'a toplanıyor. Gerçekte
+# hafta sonu toplam tüketimi de bir miktar yüksektir; bu model onu taşımıyor (# VARSAYIM).
+# Aylık toplam EPİAŞ'a kilitli olduğundan (madde 16) bu sadeleştirme yalnız hafta içi /
+# hafta sonu DAĞILIMINI etkiler, aylık seviyeyi değil.
 WEEKEND_FLATTENING_FACTOR = 0.7  # hafta sonu, tepe/çukurların genliği bu oranda daraltılır
 _RAW_HOURLY_SHAPE_WEEKEND = 1 + (_RAW_HOURLY_SHAPE_WEEKDAY - 1) * WEEKEND_FLATTENING_FACTOR
 HOURLY_SHAPE_WEEKEND = _RAW_HOURLY_SHAPE_WEEKEND / _RAW_HOURLY_SHAPE_WEEKEND.mean()
@@ -92,6 +97,8 @@ HOURLY_SHAPE_WEEKEND = _RAW_HOURLY_SHAPE_WEEKEND / _RAW_HOURLY_SHAPE_WEEKEND.mea
 SYNTHETIC_LEVEL_KWH_PER_HOUSEHOLD_MONTHLY = 200
 
 # --- has_ac mevsimsel amplitüd (# VARSAYIM, ana doküman §7) ---
+# HENÜZ TÜKETİLMİYOR: bu sabit Adım 3'te (hane bazına dağıtım) kullanılacak, Adım 2'nin
+# çıktısını etkilemiyor. Burada duruyor çünkü kalibrasyon sabitleriyle aynı ailedendir.
 # has_ac yalnız ŞEKLİ etkiler: yaz aylarında ek yük, kış aylarında dengeleyici azalış.
 # Ay bazlı çarpan deltası — toplamı (ağırlıksız) 0.0, yıllık toplam tüketime net katkı yok.
 AC_SEASONAL_DELTA_BY_MONTH = {

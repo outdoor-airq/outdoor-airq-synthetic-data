@@ -9,6 +9,10 @@ services:
     entrypoint: ["tail", "-f", "/dev/null"]
     volumes:
       - ./data/generated:/data/generated
+      # EPİAŞ cache'i (src/epias_cache.py, CACHE_DIR=/data/epias). Mount olmadan cache
+      # konteyner yeniden yaratıldığında kayboluyor ve dondurulmuş aylar her koşuda
+      # yeniden çekiliyor — cache'in var oluş sebebi ortadan kalkıyor.
+      - ./data/epias:/data/epias
     environment:
       DB_HOST: timescaledb
       DB_PORT: "5432"

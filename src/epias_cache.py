@@ -41,20 +41,25 @@ def hot_periods(today: "datetime.date | None" = None) -> set[str]:
 
 def get_monthly_province_data(
     client, alias: str, province_id: int, period_yyyymm: str, force_refresh: bool = False
-) -> pd.DataFrame:
+) -> tuple[pd.DataFrame, bool]:
     """Tek bir (alias, province_id, ay) kombinasyonu için veri döndürür — cache'ten ya da
     canlı EPİAŞ çağrısıyla. Sıcak pencere veya force_refresh'te cache'i bypass eder ve
-    üzerine yazar. (EPIAS_MODE=live için.)"""
+    üzerine yazar. (EPIAS_MODE=live için.)
+
+    Dönen ikinci değer `from_cache`: veri cache'ten mi okundu (True), canlı mı çekildi
+    (False). `level_source` etiketi BUNA bakmalı — ayın sıcak pencerede olup olmamasına
+    değil. Sıcaklık, canlı çekmenin üç tetikleyicisinden yalnız biri; force_refresh ve
+    "cache dosyası yok" durumları da canlı çağrı yapıyor."""
     path = _cache_path(alias, province_id, period_yyyymm)
     hot = period_yyyymm in hot_periods()
 
     if not force_refresh and not hot and path.is_file():
-        return _read_cache(path)
+        return _read_cache(path), True
 
     period_date = f"{period_yyyymm[:4]}-{period_yyyymm[4:6]}-01"
     df = client.call(alias, period=period_date, province_id=province_id)
     _write_cache(df, path, alias=alias, province_id=province_id, period=period_yyyymm)
-    return df
+    return df, False
 
 
 def read_cached_only(alias: str, province_id: int, period_yyyymm: str) -> pd.DataFrame:

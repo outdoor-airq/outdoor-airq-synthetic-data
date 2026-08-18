@@ -37,7 +37,7 @@ from config.epias import (
     SHAPE_SOURCE_DTYPE,
     SYNTHETIC_LEVEL_KWH_PER_HOUSEHOLD_MONTHLY,
 )
-from src.epias_cache import get_monthly_province_data, hot_periods, read_cached_only
+from src.epias_cache import get_monthly_province_data, read_cached_only
 from src.epias_client import EpiasClient
 
 OUT_PATH = Path(os.getenv("OUT_DIR", "/data/generated")) / "calibration_electricity.parquet"
@@ -93,24 +93,32 @@ def _fetch_monthly_level(bolge: str, period: str, mode: str, client, force_refre
     province_ids = BOLGE_EPIAS_PROVINCE_IDS[bolge]
     mesken_mwh = 0.0
     toplam_mwh = 0.0
+    # Bir bölge birden fazla ilden toplanabiliyor (SEDAŞ/UEDAŞ/Trakya EDAŞ). İllerden
+    # herhangi biri cache'ten geldiyse bölge değeri de "taze" sayılmaz — en zayıf halka
+    # raporlanır, çünkü epias_cached daha zayıf (ve dolayısıyla güvenli) iddiadır.
+    herhangi_biri_cacheten = False
     for pid in province_ids:
         if mode == "cached":
             df = read_cached_only("percentage-consumption-info", pid, period)
+            from_cache = True
         else:
-            df = get_monthly_province_data(
+            df, from_cache = get_monthly_province_data(
                 client, "percentage-consumption-info", pid, period, force_refresh=force_refresh
             )
         if df.empty:
             raise RuntimeError(
                 f"EPİAŞ verisi boş: bölge={bolge} province_id={pid} period={period}"
             )
+        if len(df) != 1:
+            raise RuntimeError(
+                f"EPİAŞ beklenmedik satır sayısı: bölge={bolge} province_id={pid} "
+                f"period={period} satır={len(df)} (1 bekleniyordu)"
+            )
+        herhangi_biri_cacheten = herhangi_biri_cacheten or from_cache
         mesken_mwh += float(df["household"].iloc[0])
         toplam_mwh += float(df["generalTotal"].iloc[0])
 
-    if mode == "cached":
-        level_source = "epias_cached"
-    else:
-        level_source = "epias_monthly" if period in hot_periods() else "epias_cached"
+    level_source = "epias_cached" if herhangi_biri_cacheten else "epias_monthly"
     return mesken_mwh, toplam_mwh, level_source
 
 

@@ -68,8 +68,21 @@ def dogrula_tz(df):
 
 def dogrula_oran_araligi(df):
     oran = df["mesken_payi_oran"]
-    gecti = bool(((oran > 0) & (oran <= 1)).all())
-    return gecti, f"min={oran.min():.6f} max={oran.max():.6f}"
+    aralik_ok = bool(((oran > 0) & (oran <= 1)).all())
+
+    # oran == 1.0 yalnız sentetik modda meşru (gerçek oran bilinmediği için mesken =
+    # bölge toplamı alınıyor). EPİAŞ kaynaklı bir satırda 1.0 görülürse bu veri hatasıdır.
+    birebir_bir = df[oran >= 1.0]
+    kacak = birebir_bir[birebir_bir["level_source"].astype(str) != "synthetic"]
+    gecti = aralik_ok and len(kacak) == 0
+
+    detay = f"min={oran.min():.6f} max={oran.max():.6f}"
+    if len(kacak):
+        detay += (
+            f" — HATA: {len(kacak)} satırda oran=1.0 ama level_source sentetik değil, "
+            f"örn. {kacak[['dagitim_sirketi', 'measured_at', 'level_source']].head(3).to_dict('records')}"
+        )
+    return gecti, detay
 
 
 def dogrula_pozitif_ve_sonlu(df):
@@ -91,10 +104,22 @@ def dogrula_makulluk_bandi(df, alt=0.05, ust=5.0):
 def dogrula_kaynak_kolonlari(df):
     level_null = int(df["level_source"].isna().sum())
     shape_null = int(df["shape_source"].isna().sum())
-    gecti = level_null == 0 and shape_null == 0
     dagilim_l = df["level_source"].value_counts(dropna=False).to_dict()
     dagilim_s = df["shape_source"].value_counts(dropna=False).to_dict()
-    return gecti, f"level_source={dagilim_l}, shape_source={dagilim_s}"
+
+    # Etiketler birbirini dışlamalı: aynı koşuda hem sentetik hem EPİAŞ kaynaklı
+    # seviye olması, mod karışması demektir (bkz. yama-01). `value_counts(dropna=False)`
+    # kategorik dtype'ta sayısı 0 olan kategorileri de anahtar olarak listeler — bu
+    # yüzden yalnızca GERÇEKTEN görülen (count>0) etiketlere bakılır.
+    epias_etiketleri = {"epias_monthly", "epias_cached", "epias_derived"}
+    bulunan = {k for k, v in dagilim_l.items() if v > 0}
+    karisik = bool(bulunan & epias_etiketleri) and "synthetic" in bulunan
+
+    gecti = level_null == 0 and shape_null == 0 and not karisik
+    detay = f"level_source={dagilim_l}, shape_source={dagilim_s}"
+    if karisik:
+        detay += " — UYARI: aynı çıktıda hem synthetic hem EPİAŞ kaynaklı seviye var"
+    return gecti, detay
 
 
 def dogrula_carpim_tutarli(df, tol=1e-6):
