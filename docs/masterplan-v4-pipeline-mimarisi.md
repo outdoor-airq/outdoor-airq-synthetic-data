@@ -465,7 +465,7 @@ topic oluşturma, publisher kodu, Flink/TimescaleDB değişikliği bu adımda YA
   "theta_ref": 4.8,
   "shape_factor": 1.83,
   "level_source": "gazbir_monthly",
-  "shape_source": "bdew_siglinde",
+  "shape_source": "bdew_sigmoid",
   "temp_source": "open_meteo"
 }
 ```

@@ -401,10 +401,12 @@ sonradan analiz verisiyle revize olur — Adım 2'nin UEÇM revizyon mantığın
 ### 4.2 Şekil katmanı — `heating_shape.py` (saf fonksiyon) — **Faz 2 spike ile revize edildi**
 
 > **Spike bulgusu (2026-08-20):** Bu bölüm ilk yazıldığında `doğalgaz_deepresearch.md`'nin
-> PDF'ten okuduğu 8 parametreli formül esas alınmıştı. Faz 2 spike'ı `demandlib` paketinin
-> (resmi, bakımı yapılan, PDF'ten elle kopyalama riski taşımayan kaynak) gerçek SigLinDe
-> uygulamasını kullandığında bu formülün **var olmadığı** ortaya çıktı — aşağıdaki formül
-> güncel ve tektir, eski 8 parametreli hali yalnızca Ek A.3'te tarihsel kayıt olarak durur.
+> PDF'ten okuduğu, 8 parametreli, doğrusal su-ısıtma terimli **SigLinDe** formülü esas
+> alınmıştı. Faz 2 spike'ı `demandlib` paketini (resmi, bakımı yapılan, PDF'ten elle
+> kopyalama riski taşımayan kaynak) kullandığında kullanılan katsayıların **SigLinDe değil**,
+> daha basit klasik 4 parametreli BDEW sigmoidi (`shlp_sigmoid_factors.csv`) olduğu ortaya
+> çıktı — doğrusal terim demandlib'de hiç yok. Aşağıdaki formül güncel ve tektir, eski 8
+> parametreli SigLinDe hali yalnızca Ek A.3'te tarihsel kayıt olarak durur.
 
 ```
 h(theta) = A / (1 + (B/(theta - 40))^C) + D
@@ -632,7 +634,7 @@ maddesi 14'tür.
 | `il_kodu` | uint8 | `config/provinces.py` ile birebir |
 | `il_adi` | category | |
 | `ilce_kayit_no` | uint32, **nullable** | Yalnız İstanbul (§4.3.1), diğer illerde NULL |
-| `gaz_dagitim_sirketi` | category | §6 madde 2 ile doğrulanmış eşleme |
+| `gaz_dagitim_sirketi` | category | §6 madde 2 ile doğrulanmış eşleme — **doğrulama tarihi ≠ referans yıl** (`config/gas.py`: `GAZ_DAGITIM_MAP_DOGRULAMA_TARIHI="2026-08-20"` vs `KALIBRASYON_REFERANS_YILI="2025"`; harita bugünün lisans sahibini gösterir, kalibrasyon 2025'i hedefler — kabul edilen, çözülmeyen fark, çünkü bu kolon yalnızca payload'a taşınan bir etikettir, hiçbir IPF/hesap girdisi değildir) |
 | `tarih` | timestamp[us, tz=Europe/Istanbul] | Gün başlangıcı |
 | `theta_ref` | float32 | §4.1 geometrik ağırlıklı referans sıcaklık |
 | `hdd` | float32 | `max(0, 18 - Tm)`, çapraz kontrol için |
@@ -652,7 +654,7 @@ Sıralama: `il_kodu, tarih`.
 ```python
 GAS_LEVEL_SOURCE_DTYPE  = ['epdk_annual', 'gazbir_monthly', 'igdas_ilce',
                            'epdk_derived', 'synthetic']
-HEATING_SHAPE_SOURCE_DTYPE = ['bdew_siglinde', 'hdd_proportional', 'synthetic_curve']
+HEATING_SHAPE_SOURCE_DTYPE = ['bdew_sigmoid', 'hdd_proportional', 'synthetic_curve']
 TEMP_SOURCE_DTYPE       = ['open_meteo', 'open_meteo_cached', 'era5', 'mgm_normal', 'synthetic']
 ```
 
@@ -675,7 +677,7 @@ döner, her madde `OK` / `FARKLI` etiketiyle ayrı yazdırılır.
 | # | Kontrol |
 |---|---|
 | 1 | `data/bdew/bdew_gas_sigmoid_coefficients.csv` başlığındaki kaynak paket/sürüm/tarih/formül/`wind_class` açıklaması dolu; katsayı sayısı beklenen |
-| 2 | Gaz dağıtım şirketi × il eşlemesi 11 ili tam kapsıyor, boşluk/çakışma yok; GAZBİR listesiyle doğrulandığı not edilmiş |
+| 2 | `GAZ_DAGITIM_MAP` 11 ili tam kapsıyor, boşluk/çakışma yok. `'DOĞRULANACAK'` değeri **yalnızca** `config/gas.py`'daki `DAGITIM_MAP_BEKLEYEN`'de adı geçen iller için kabul edilir (2026-08-20 itibarıyla tam olarak `{77: 'Yalova'}`); listede olmayan bir ilde `'DOĞRULANACAK'` görülürse HATA. Ayrıca `len(DAGITIM_MAP_BEKLEYEN) <= 1` — liste büyürse HATA (bilinen eksik adı-konmuş bir istisna olarak kalmalı, "15/16 de olur" diye normalleşip gerçek bir kırılmayı gizlememeli) |
 | 3 | **İŞARET TESTİ:** her profil için `h(6) / h(26) > 1`; değer bantla birlikte yazdırılıyor (§4.2.1) |
 | 4 | **Türkiye kalibrasyonu (yumuşak bant — Faz 2 spike'ı Ocak/Ağustos=7,996 ve yıllık=953,0 ile sınırda geçti, §4.2.2):** Ocak/Ağustos ∈ [8,10]; ısıtma-dışı pay ∈ [%20,%28]; yıllık m³/hane ∈ [750,950]. Üçü birden. **Not: bu bant §4.3'ün IPF'i tarafından üzerine yazılır** — IPF yakınsadıktan sonra nihai Ocak/Ağustos oranı GAZBİR'in gerçek oranıdır, bu madde yalnızca h(θ)'nın makul bir ara ürün olduğunu doğrular, kesin kabul kriteri değildir |
 | 5 | **Isınma payı:** pencere ilk 3 gününün `theta_ref`'i, 3 gün öncesi çekilmeden hesaplananla **farklı** (yani ısınma gerçekten uygulanmış) |
@@ -743,7 +745,7 @@ Masterplan §10'a eklenecek. **Üretim hazır olmasa bile bu şema F3'ten önce 
   "theta_ref": 4.8,
   "shape_factor": 1.83,
   "level_source": "gazbir_monthly",
-  "shape_source": "bdew_siglinde",
+  "shape_source": "bdew_sigmoid",
   "temp_source": "open_meteo"
 }
 ```
