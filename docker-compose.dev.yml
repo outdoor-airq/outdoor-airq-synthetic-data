@@ -9,6 +9,7 @@ services:
     entrypoint: ["tail", "-f", "/dev/null"]
     volumes:
       - ./data/generated:/data/generated
+      - ./data/weather:/data/weather
     environment:
       DB_HOST: timescaledb
       DB_PORT: "5432"

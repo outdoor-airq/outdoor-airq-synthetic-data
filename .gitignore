@@ -7,6 +7,9 @@ venv/
 # data/tuik/ ise BILEREK commit'li: girdi kaynagi, uretimi tekrarlanabilir kiliyor.
 data/generated/
 
+# Adim 2b: Open-Meteo sicaklik cache'i, .env gibi yeniden uretilebilir/yerel veri.
+data/weather/
+
 .env
 .envrc.local
 
