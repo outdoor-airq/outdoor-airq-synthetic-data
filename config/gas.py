@@ -7,6 +7,8 @@ Adım 2b (bkz. docs/prompts/adim-02b-dogalgaz-kati-yakit-yonergesi.md). Karar 1:
 seviye katmanında, §4.3, burada değil).
 """
 
+import os
+
 import pandas as pd
 
 # --- Gaz dağıtım şirketi haritası -------------------------------------------------
@@ -105,7 +107,12 @@ GAZ_DAGITIM_SIRKETI_DTYPE = pd.CategoricalDtype(
 #   h(theta) = A / (1 + (B/(theta-40))^C) + D
 # — PDF kaynağının varsaydığı doğrusal su-ısıtma terimi (max(m_H*theta+b_H, ...)) bu
 # pakette YOK, dolayısıyla serbest bir "W" kalibrasyon parametresi de yok.
-BDEW_COEFFICIENTS_CSV = 'data/bdew/bdew_gas_sigmoid_coefficients.csv'
+#
+# Yol, data/tuik/*.csv ile AYNI DESEN (src/load_tuik.py): mutlak container yolu, env
+# değişkeniyle override edilebilir. Dockerfile bunu image'a gömecek (COPY data/bdew/
+# /data/bdew/, data/tuik ile aynı gerekçeyle — küçük, statik, versiyonlu girdi).
+BDEW_DATA_DIR = os.getenv("BDEW_DATA_DIR", "/data/bdew")
+BDEW_COEFFICIENTS_CSV = f"{BDEW_DATA_DIR}/bdew_gas_sigmoid_coefficients.csv"
 BDEW_THETA0 = 40  # sigmoid formülündeki theta0, demandlib'de sabit
 
 # wind_class=1 seçildi — gerekçe FİZİKSEL (Marmara Türkiye'nin en rüzgârlı bölgesi:

@@ -15,6 +15,10 @@ COPY generate_population.py load_to_db.py ./
 # 7.6 MB, statik girdi - repoda zaten commit'li.
 COPY data/tuik/ /data/tuik/
 
+# Ayni gerekce, Adim 2b: config/gas.py BDEW_COEFFICIENTS_CSV'yi /data/bdew MUTLAK
+# yolundan okuyor. ~1 KB, statik, versiyonlu (demandlib'den bir kerelik disa aktarim).
+COPY data/bdew/ /data/bdew/
+
 ENV PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app
 
