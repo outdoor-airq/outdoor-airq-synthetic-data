@@ -1,0 +1,34 @@
+# Kaynak: EPDK 2025 Yili Dogal Gaz Piyasasi Gelisim Raporu, Tablo 8.3
+#   "2025 yili Il Bazinda Tuketim Miktarlari (Milyon Sm3)" - basligindaki yil raporun
+#   kendi yayin doneminin ayni yili (2025), yonergenin endiselendigi ~1 yillik EPDK
+#   gecikmesi BU RAPOR ICIN GECERLI DEGIL.
+# URL: https://www.epdk.gov.tr/Detay/Icerik/3-0-94-1007/dogal-gazyillik-sektor-raporu
+#   (indirme linki: https://www.epdk.gov.tr/Detay/DownloadDocument?id=fSTHy8vYN/Q= )
+# Sayfa: PDF sayfa 57 (belge iceren sayfa numarasi), pdf dosya sayfa index 69-70
+# Cekilme tarihi: 2026-08-20
+#
+# ONEMLI SINIRLAMA - COZULMEDI: bu tablo TUM SEKTORLERIN (mesken+ticari+sanayi+...)
+# toplam il tuketimidir, MESKEN-ozel il tuketimi DEGILDIR. Raporda il x sektor kesisimi
+# veren bir tablo YOK (Tablo 8.2 sektorel dagilimi yalniz ULUSAL veriyor, il kirilimi
+# yok). Ulusal Konut payi 2025: 20.857,02 / 59.072,53 = %35,31 (Tablo 8.2) -- bu il
+# bazina UYGULANMADI (duz uygulamak sanayi agirlikli Kocaeli/Bursa ile mesken agirlikli
+# Yalova/Bilecik'i ayni oranla yanlis olcekler). tuketim_milyon_sm3 kolonu TOPLAM sektor,
+# mesken ayirimi asagi akista (Karar 4 blogu) ayrica cozulecek.
+#
+# AYRICA COZULMEDI: EPDK Tablo 7.3, yonergenin varsaydigi gibi il bazli MESKEN ABONE
+# SAYISI vermiyor -- bu raporda "Tablo 7.3: Abone ve Serbest Tuketici Sayisinin
+# Dagilimi" ULUSAL YILLIK bir zaman serisi (2021-2025, tum musteri turleri), il kirilimi
+# yok. Raporun hicbir yerinde il x mesken abone sayisi tablosu bulunamadi -- bu
+# Kapi'nin durma kurali burada isletildi, veri UYDURULMADI.
+il_adi,tuketim_milyon_sm3_TOPLAM_SEKTOR
+İstanbul,8443.539
+Kocaeli,4121.521
+Sakarya,1566.375
+Bursa,3771.856
+Balıkesir,1920.976
+Çanakkale,413.819
+Yalova,186.488
+Tekirdağ,1862.852
+Edirne,180.672
+Kırklareli,1521.594
+Bilecik,532.375

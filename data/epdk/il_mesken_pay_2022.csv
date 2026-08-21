@@ -1,0 +1,31 @@
+# Kaynak: EPDK 2022 Yili Dogal Gaz Piyasasi Sektor Raporu (DOCX)
+# URL: https://www.epdk.gov.tr/Detay/Icerik/3-0-94-1007/dogal-gazyillik-sektor-raporu
+#   (indirme linki: https://www.epdk.gov.tr/Detay/DownloadDocument?id=J3PMRLrxosE= )
+# Tablo: il bazli sektorel tuketim tablolari (81 il icin ayri tablo, il basina
+#   sirket x lisans turu kirilimi + TOPLAM satiri; "Konutlar" kolonu mesken tuketimi,
+#   "Genel Toplam" o ilin tum sektorlerinin toplami). Marmara'nin 11 ili icin
+#   ilgili tablo (word/document.xml'deki tablo indeksi) elle eslendi.
+# Cekilme tarihi: 2026-08-20
+#
+# KULLANIM NIYETI (Hamle 2, kullanici karariyla): bu dosyadan yalniz mesken_pay_2022
+#   ORANI kullanilir, konut_milyon_sm3_2022/genel_toplam_milyon_sm3_2022 MUTLAK
+#   SEVIYE OLARAK KULLANILMAZ -- seviye 2025 GAZBİR/EPDK'dan gelir (yil uyumsuzlugu
+#   boylece oran sabitligi varsayimiyla cozulur, kirpilmaz).
+#
+# CAPRAZ DOGRULAMA: Istanbul icin bu tablodan mesken_pay_2022=%60.82 cikiyor;
+#   Kapi 1 (IGDAS 2025) + Kapi 2 (EPDK Tablo 8.3 2025) capraz kontrolunden bagimsiz
+#   olarak hesaplanan mesken_pay_2025=%61.84 ile neredeyse ayni (fark 1.02 puan,
+#   farkli yil + farkli kaynak + farkli metodoloji). Oranin yil ustu kararliligini
+#   destekliyor.
+il_adi,konut_milyon_sm3_2022,genel_toplam_milyon_sm3_2022,mesken_pay_2022
+İSTANBUL,5076.01566596,8346.65705761,0.6081
+KOCAELİ,637.50167635,3823.2733135999997,0.1667
+SAKARYA,280.45606804000005,1469.7925651199998,0.1908
+BURSA,880.5220363999999,3354.65280373,0.2625
+BALIKESİR,208.82484861,1832.32866057,0.114
+ÇANAKKALE,106.99939115000001,429.53459530000003,0.2491
+YALOVA,94.72988101,187.58759052000002,0.505
+TEKİRDAĞ,297.33585889999995,1719.4864431300002,0.1729
+EDİRNE,81.3528672,121.56025654999999,0.6692
+KIRKLARELİ,92.04425209,945.4013644400001,0.0974
+BİLECİK,66.47347891,605.4223009299999,0.1098

@@ -1,0 +1,39 @@
+# Kaynak: GAZBIR (Turkiye Dogal Gaz Dagiticilari Birligi) Aylik Dogal Gaz Sektor
+#   Raporlari, 2025 yilinin 12 ayi. Her ayin PDF'inde sayfa 8:
+#   "Turkiye'deki Cografi Bolgelerin <Ay> Ayi Ortalama Hane Basi Konut Tuketimleri
+#   ve Sicaklik Karsilastirmasi" -- Marmara Bolgesi degeri grafik etiketi VE
+#   narratif metin cumlesiyle CAPRAZ DOGRULANDI (12/12 ay icin ikisi ayni).
+# URL kalibi: https://gazbir.org.tr/uploads/file/<Ay>-2025-Sektor-Raporu.pdf
+#   (Subat/Agustos/Eylul URL'lerinde Turkce karakter YOK -- Subat, Agustos, Eylul;
+#   digerlerinde VAR -- Mayıs, Kasım, Aralık; portaldaki tutarsizlik, tek tek denendi)
+# Cekilme tarihi: 2026-08-20
+# Kismi cikarim degil -- 12/12 ay tam cikarildi.
+#
+# ACIK SORU - COZULMEDI (SS4.4.1): raporun basligi "...Hane Basi..." diyor (abone
+# demiyor) ama bunun gercekten tekil hane sayisina mi yoksa abone/sayac sayisina mi
+# bolunerek hesaplandigina dair bir metodoloji notu / dipnot bulunamadi. Yonergenin
+# planladigi "belirsizse abone kabul edilip %26 duzeltmesi uygulanir" yolu HENUZ
+# UYGULANMADI -- bu, sonraki (Karar 4/merkezi_pay) blogunda ele alinacak.
+#
+# CAPRAZ DOGRULAMA: Ocak 2025 degeri (154.6 m3) Faz 2 spike'inda kullanilan cipa
+# sayisiyla birebir ayni -- spike'in kullandigi sayi simdi gercek, alinti verilebilir
+# bir kaynaga baglandi.
+#
+# DIKKAT (madde 4/6 bant revizyonu icin sinyal, cozulmedi): bu 12 aylik gercek
+# seriden Ocak/Agustos orani = 154.6/12.4 = 12.47 -- yonergenin [8,10] hedef
+# bandinin (BOTAS KFU'dan, PDF kaynakli, dogrulanmamis) USTUNDE. Marmara-geneli
+# gercek olcum ile Istanbul-ozel eski tahmin farkli seyler olabilir; bant bu yeni
+# veriyle yeniden degerlendirilmeli (bu turda yapilmadi).
+ay,marmara_hane_basi_m3,kaynak_url
+1,154.6,https://gazbir.org.tr/uploads/file/Ocak-2025-Sektor-Raporu.pdf
+2,176.2,https://gazbir.org.tr/uploads/file/Subat-2025-Sektor-Raporu.pdf
+3,182.5,https://gazbir.org.tr/uploads/file/Mart-2025-Sektor-Raporu.pdf
+4,117.0,https://gazbir.org.tr/uploads/file/Nisan-2025-Sektor-Raporu.pdf
+5,71.5,https://gazbir.org.tr/uploads/file/Mayıs-2025-Sektor-Raporu.pdf
+6,23.3,https://gazbir.org.tr/uploads/file/Haziran-2025-Sektor-Raporu.pdf
+7,14.4,https://gazbir.org.tr/uploads/file/Temmuz-2025-Sektor-Raporu.pdf
+8,12.4,https://gazbir.org.tr/uploads/file/Agustos-2025-Sektor-Raporu.pdf
+9,12.9,https://gazbir.org.tr/uploads/file/Eylul-2025-Sektor-Raporu.pdf
+10,22.3,https://gazbir.org.tr/uploads/file/Ekim-2025-Sektor-Raporu.pdf
+11,60.2,https://gazbir.org.tr/uploads/file/Kasım-2025-Sektor-Raporu.pdf
+12,95.5,https://gazbir.org.tr/uploads/file/Aralık-2025-Sektor-Raporu.pdf
