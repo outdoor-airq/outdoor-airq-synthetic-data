@@ -240,3 +240,17 @@ Claude Code bu dosyaya sadece kullanıcı onayı sonrası satır ekler, sonra co
   **Dört doğrulama TEKRAR koşuldu, hepsi geçti:** Ek A.6 (RNG korunumu, orijinal — Karar 4 öncesi — dosyaya karşı bit-bit aynı `base_multiplier`/`has_ac`), madde 19 (bölüntü, 11/11 il tam eşitlik), Adım 1'in 15 maddesi (15/15), fuel_type dağılımı (%56,25 kömür, hedefe ±0,15 puan).
 
   **Nihai sayılar:** `Σ kombi_hane=6.149.023`, `Σ merkezi_hane=1.363.320`, `Σ soba_hane=486.046`, `Σ elektrikli_hane=531.139` (Ek A.1/A.2/A.6/A.7 ve doğrulama madde 16 yönergede güncellendi). Eski (orijinal, Karar 4 öncesi) yedek `data/generated/households.parquet.karar4-oncesi-yedek`'te duruyor (git'e girmiyor) — onaylayan: yusuf
+
+- [2026-08-21] adim2b-households-marmara-yukleme: `households_marmara` (TimescaleDB `energy_demo`) Karar 4'ün A/B-düzeltilmiş `households.parquet`'iyle (md5 `37c65a0d...`) yeniden yüklendi. **Yükleme öncesi mekanizma doğrulandı:** `load_to_db.py` `TRUNCATE households_marmara` çalıştırıp SONRA `COPY` yapıyor (satır 84) — ekleme değil tam değiştirme, "17 milyon satıra çıkar" riski yoktu. Docker Desktop kapalıydı, başlatıldı; `core-timescaledb-1` container'ı `Exited (255)` durumundaydı (Docker Desktop'ın kendi yeniden başlamasından, veri bozulması değil — loglar temiz kurtarma gösterdi), `docker start` ile ayağa kaldırıldı.
+
+  **Yükleme öncesi/sonrası satır sayısı:**
+  - Öncesi: `households_marmara`=8.529.528 (Karar 4 öncesi, orijinal sayılarla — `isitma_tipi` dağılımı Ek A.1'in eski tablosuyla birebir eşleşti), `households`=5 (dokunulmamış).
+  - COPY: 15 row-group, 8.529.528 satır, 147,3s. İndeksler + `ANALYZE` sonrası toplam 158,3s.
+  - Sonrası: `households_marmara`=**8.529.528** (tam), `households`=**5** (değişmedi).
+
+  **Üç eşitlik doğrulandı, hepsi tam:**
+  1. `COUNT(*)` = 8.529.528 ✓
+  2. `GROUP BY dagitim_sirketi`: BEDAŞ 3.139.331 · AYEDAŞ 1.778.428 · SEDAŞ 1.011.180 · UEDAŞ 1.842.339 · Trakya EDAŞ 758.250 — **bölge toplamları Karar 4 ÖNCESİYLE birebir aynı** (yönergenin öngördüğü gibi: düzeltme il-içi yeniden dağıtım, bölge toplamlarına dokunmadı — Adım 2 kalibrasyonu ve Adım 3'ün `w_bölge` sabitleri güvende).
+  3. `GROUP BY isitma_tipi`: kombi 6.149.023 · merkezi 1.363.320 · soba 486.046 · elektrikli 531.139 — parquet'teki sayılarla birebir.
+
+  **Madde 21 il bazlı genişletildi** (yönergeye işlendi): toplam sapma %-2,54 (GEÇTİ, ±%5 içinde); il bazlı — İstanbul -%2,33, Kocaeli -%6,17, Sakarya -%5,27, Bursa -%0,09, Balıkesir +%1,55, Çanakkale +%0,60, Yalova -%3,60, Tekirdağ +%1,68, Edirne -%1,82, **Kırklareli -%22,70 (UYARI, eşik ±%15 aşıldı)**, Bilecik +%1,74. Kırklareli'nin sapması bilinen ve kabul edilen (%97 tavanının doğrudan sonucu) — toplamın içine gizlenmeden UYARI olarak kalıcı kayıtta duruyor. — onaylayan: yusuf
