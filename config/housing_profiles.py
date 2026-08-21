@@ -29,22 +29,27 @@ ISITMA_TIPI_ORANLARI_ESKI_ULUSAL = {
 }
 
 
-# --- 7.2b Isıtma tipi — İL bazlı (Karar 4 düzeltmesi, 2026-08-21) --------------------
-# Kaynak: adim-02b-dogalgaz-kati-yakit-yonergesi.md Karar 4. Eski ISITMA_TIPI_ORANLARI
-# (aşağıda, tarihsel referans) tüm Türkiye için TEK tablo kullanıyordu — il farkını
-# görmüyordu. Düzeltme iki katmanlı:
-#   Katman 1 (11 il): toplam gaz payı (kombi+merkezi) EPDK/GAZBİR/İGDAŞ zincirinden
-#     ölçülen kapsama(il)/boşluk_faktörü hedefine çekilir (%100'de tavanlı);
-#     kombi:merkezi oranı VE soba:elektrikli oranı korunur.
-#   Katman 2 (yalnız İstanbul apartman): kombi/merkezi ayrımı İGDAŞ'ın 39 ilçelik gerçek
-#     sayım verisinden (data/igdas/ilce_kullanim_sinifi_2025.csv) ilçe başına türetilir —
-#     bkz. ISITMA_TIPI_ORANLARI_ISTANBUL_ILCE, aşağıda.
-# boşluk_faktörü = 5.485.643 / 4.917.759 = 1.115476 (İstanbul konut abonesi / toplam hane,
-# İstanbul'un fiilen tam gazlı olduğu varsayımından türetilir — # VARSAYIM, 11 ilin
-# hepsini ölçekliyor).
+# --- 7.2b Isıtma tipi — İL bazlı (Karar 4 düzeltmesi, 2026-08-21, A+B revizyonu) ------
+# Kaynak: adim-02b-dogalgaz-kati-yakit-yonergesi.md Karar 4. İki katman + iki güvenlik/
+# gerçekçilik düzeltmesi (A, B — 2026-08-21, ilk turun ardından):
+#   Katman 1 (11 il): toplam gaz payı hedefi kapsama(il)/boşluk_faktörü, **%97'de
+#     tavanlı** (A — hiçbir ilde soba+elektrikli tamamen sıfırlanamaz; ilk turda
+#     Kırklareli %100'e dayanıp bu iki kategoriyi sıfırlamıştı, bu bir bulgu değil
+#     yöntemin en düşük mesken_pay'e sahip ilde en kırılgan olmasıydı).
+#   Katman 1 içinde YENİDEN DAĞITIM (B): il-içi hedefe ulaşırken (konut_tipi, kent_kir)
+#     hücreleri ARTIK EŞİT PAYLA değil, DENSITY_AGIRLIK ile ağırlıklı hareket eder —
+#     şebekenin yoğun yerleşime önce ulaştığı varsayımıyla (# VARSAYIM, aşağıda).
+#     İlk turda tüm hücreler aynı il-hedefine eşit çekiliyordu; bu, apartmanla aynı
+#     kent_kir sınıfındaki müstakili aşırı gazlaştırıyordu (müstakil payı model
+#     genelinde %9,34'ten %16,18'e sıçramıştı — gerçekçi değil).
+#   Katman 2 (yalnız İstanbul apartman): DEĞİŞMEDİ — İGDAŞ'ın 39 ilçelik gerçek
+#     sayımından (data/igdas/ilce_kullanim_sinifi_2025.csv) türetiliyor, A/B'den
+#     etkilenmiyor (zaten ölçülmüş veri, model varsayımı değil).
+# boşluk_faktörü = 1.115476 (İstanbul konut abonesi / toplam hane).
+GAZ_PAYI_TAVAN = 0.97  # A — hiçbir ilde bu sınırı aşamaz
 GAZ_PAYI_HEDEF_IL = {
-    34: 0.992779,  # İstanbul
-    41: 0.979866,  # Kocaeli
+    34: 0.970000,  # İstanbul
+    41: 0.970000,  # Kocaeli
     54: 0.825015,  # Sakarya
     16: 0.903940,  # Bursa
     10: 0.434132,  # Balıkesir
@@ -52,85 +57,93 @@ GAZ_PAYI_HEDEF_IL = {
     77: 0.860026,  # Yalova
     59: 0.780724,  # Tekirdağ
     22: 0.757243,  # Edirne
-    39: 1.000000,  # Kırklareli
+    39: 0.970000,  # Kırklareli
     11: 0.718495,  # Bilecik
 }
 
-# (il_kodu, konut_tipi, kent_kir) -> oranlar. Tüm 11 il, iki konut tipi, uygun kent_kir
-# kombinasyonları. İstanbul-apartman satırları burada YOK — ISITMA_TIPI_ORANLARI_ISTANBUL_ILCE
-# bunları ilçe çözünürlüğünde geçersiz kılar (bkz. src/assign_attributes.py::ata_isitma_tipi).
-ISITMA_TIPI_ORANLARI_IL = {
-    (34, 'mustakil', 'YOĞUN KENT'): {'kombi': 0.992779, 'merkezi': 0.000000, 'soba': 0.001966, 'elektrikli': 0.005256},
-    (34, 'mustakil', 'ORTA YOĞUN KENT'): {'kombi': 0.992779, 'merkezi': 0.000000, 'soba': 0.003859, 'elektrikli': 0.003362},
-    (34, 'mustakil', 'KIR'): {'kombi': 0.992779, 'merkezi': 0.000000, 'soba': 0.005095, 'elektrikli': 0.002126},
-    (41, 'apartman', 'YOĞUN KENT'): {'kombi': 0.599815, 'merkezi': 0.380051, 'soba': 0.004061, 'elektrikli': 0.016073},
-    (41, 'apartman', 'ORTA YOĞUN KENT'): {'kombi': 0.716354, 'merkezi': 0.263511, 'soba': 0.008111, 'elektrikli': 0.012024},
-    (41, 'apartman', 'KIR'): {'kombi': 0.857722, 'merkezi': 0.122144, 'soba': 0.012744, 'elektrikli': 0.007391},
-    (41, 'mustakil', 'YOĞUN KENT'): {'kombi': 0.979866, 'merkezi': 0.000000, 'soba': 0.005428, 'elektrikli': 0.014706},
-    (41, 'mustakil', 'ORTA YOĞUN KENT'): {'kombi': 0.979866, 'merkezi': 0.000000, 'soba': 0.010764, 'elektrikli': 0.009371},
-    (41, 'mustakil', 'KIR'): {'kombi': 0.979866, 'merkezi': 0.000000, 'soba': 0.014183, 'elektrikli': 0.005951},
-    (54, 'apartman', 'YOĞUN KENT'): {'kombi': 0.505324, 'merkezi': 0.319690, 'soba': 0.035393, 'elektrikli': 0.139592},
-    (54, 'apartman', 'ORTA YOĞUN KENT'): {'kombi': 0.604250, 'merkezi': 0.220765, 'soba': 0.069693, 'elektrikli': 0.105292},
-    (54, 'apartman', 'KIR'): {'kombi': 0.731293, 'merkezi': 0.093722, 'soba': 0.111337, 'elektrikli': 0.063648},
-    (54, 'mustakil', 'YOĞUN KENT'): {'kombi': 0.825015, 'merkezi': 0.000000, 'soba': 0.047460, 'elektrikli': 0.127525},
-    (54, 'mustakil', 'ORTA YOĞUN KENT'): {'kombi': 0.825015, 'merkezi': 0.000000, 'soba': 0.094031, 'elektrikli': 0.080954},
-    (54, 'mustakil', 'KIR'): {'kombi': 0.825015, 'merkezi': 0.000000, 'soba': 0.124089, 'elektrikli': 0.050896},
-    (16, 'apartman', 'YOĞUN KENT'): {'kombi': 0.552751, 'merkezi': 0.351189, 'soba': 0.019123, 'elektrikli': 0.076937},
-    (16, 'apartman', 'ORTA YOĞUN KENT'): {'kombi': 0.661564, 'merkezi': 0.242375, 'soba': 0.037615, 'elektrikli': 0.058445},
-    (16, 'apartman', 'KIR'): {'kombi': 0.804300, 'merkezi': 0.099640, 'soba': 0.061204, 'elektrikli': 0.034857},
-    (16, 'mustakil', 'YOĞUN KENT'): {'kombi': 0.903940, 'merkezi': 0.000000, 'soba': 0.026077, 'elektrikli': 0.069983},
-    (16, 'mustakil', 'ORTA YOĞUN KENT'): {'kombi': 0.903940, 'merkezi': 0.000000, 'soba': 0.051105, 'elektrikli': 0.044955},
-    (16, 'mustakil', 'KIR'): {'kombi': 0.903940, 'merkezi': 0.000000, 'soba': 0.067766, 'elektrikli': 0.028294},
-    (10, 'apartman', 'YOĞUN KENT'): {'kombi': 0.265403, 'merkezi': 0.168729, 'soba': 0.110617, 'elektrikli': 0.455251},
-    (10, 'apartman', 'ORTA YOĞUN KENT'): {'kombi': 0.319072, 'merkezi': 0.115060, 'soba': 0.225667, 'elektrikli': 0.340201},
-    (10, 'apartman', 'KIR'): {'kombi': 0.383949, 'merkezi': 0.050183, 'soba': 0.355736, 'elektrikli': 0.210132},
-    (10, 'mustakil', 'YOĞUN KENT'): {'kombi': 0.434132, 'merkezi': 0.000000, 'soba': 0.151848, 'elektrikli': 0.414020},
-    (10, 'mustakil', 'ORTA YOĞUN KENT'): {'kombi': 0.434132, 'merkezi': 0.000000, 'soba': 0.305227, 'elektrikli': 0.260642},
-    (10, 'mustakil', 'KIR'): {'kombi': 0.434132, 'merkezi': 0.000000, 'soba': 0.399096, 'elektrikli': 0.166772},
-    (17, 'apartman', 'YOĞUN KENT'): {'kombi': 0.275904, 'merkezi': 0.175686, 'soba': 0.107599, 'elektrikli': 0.440811},
-    (17, 'apartman', 'ORTA YOĞUN KENT'): {'kombi': 0.330519, 'merkezi': 0.121072, 'soba': 0.223634, 'elektrikli': 0.324775},
-    (17, 'apartman', 'KIR'): {'kombi': 0.402338, 'merkezi': 0.049253, 'soba': 0.350621, 'elektrikli': 0.197789},
-    (17, 'mustakil', 'YOĞUN KENT'): {'kombi': 0.451590, 'merkezi': 0.000000, 'soba': 0.134274, 'elektrikli': 0.414136},
-    (17, 'mustakil', 'ORTA YOĞUN KENT'): {'kombi': 0.451590, 'merkezi': 0.000000, 'soba': 0.296649, 'elektrikli': 0.251761},
-    (17, 'mustakil', 'KIR'): {'kombi': 0.451590, 'merkezi': 0.000000, 'soba': 0.387550, 'elektrikli': 0.160860},
-    (77, 'apartman', 'YOĞUN KENT'): {'kombi': 0.528198, 'merkezi': 0.331828, 'soba': 0.027106, 'elektrikli': 0.112868},
-    (77, 'apartman', 'ORTA YOĞUN KENT'): {'kombi': 0.634074, 'merkezi': 0.225952, 'soba': 0.056131, 'elektrikli': 0.083843},
-    (77, 'apartman', 'KIR'): {'kombi': 0.772462, 'merkezi': 0.087564, 'soba': 0.088904, 'elektrikli': 0.051070},
-    (77, 'mustakil', 'YOĞUN KENT'): {'kombi': 0.860026, 'merkezi': 0.000000, 'soba': 0.039711, 'elektrikli': 0.100263},
-    (77, 'mustakil', 'ORTA YOĞUN KENT'): {'kombi': 0.860026, 'merkezi': 0.000000, 'soba': 0.075678, 'elektrikli': 0.064296},
-    (77, 'mustakil', 'KIR'): {'kombi': 0.860026, 'merkezi': 0.000000, 'soba': 0.099569, 'elektrikli': 0.040405},
-    (59, 'apartman', 'YOĞUN KENT'): {'kombi': 0.475599, 'merkezi': 0.305124, 'soba': 0.043832, 'elektrikli': 0.175444},
-    (59, 'apartman', 'ORTA YOĞUN KENT'): {'kombi': 0.569206, 'merkezi': 0.211518, 'soba': 0.089179, 'elektrikli': 0.130097},
-    (59, 'apartman', 'KIR'): {'kombi': 0.699478, 'merkezi': 0.081246, 'soba': 0.138112, 'elektrikli': 0.081164},
-    (59, 'mustakil', 'YOĞUN KENT'): {'kombi': 0.780724, 'merkezi': 0.000000, 'soba': 0.060755, 'elektrikli': 0.158521},
-    (59, 'mustakil', 'ORTA YOĞUN KENT'): {'kombi': 0.780724, 'merkezi': 0.000000, 'soba': 0.118515, 'elektrikli': 0.100762},
-    (59, 'mustakil', 'KIR'): {'kombi': 0.780724, 'merkezi': 0.000000, 'soba': 0.155381, 'elektrikli': 0.063895},
-    (22, 'apartman', 'YOĞUN KENT'): {'kombi': 0.462247, 'merkezi': 0.294996, 'soba': 0.047499, 'elektrikli': 0.195259},
-    (22, 'apartman', 'ORTA YOĞUN KENT'): {'kombi': 0.557763, 'merkezi': 0.199479, 'soba': 0.096219, 'elektrikli': 0.146538},
-    (22, 'apartman', 'KIR'): {'kombi': 0.670114, 'merkezi': 0.087129, 'soba': 0.157780, 'elektrikli': 0.084978},
-    (22, 'mustakil', 'YOĞUN KENT'): {'kombi': 0.757243, 'merkezi': 0.000000, 'soba': 0.064680, 'elektrikli': 0.178078},
-    (22, 'mustakil', 'ORTA YOĞUN KENT'): {'kombi': 0.757243, 'merkezi': 0.000000, 'soba': 0.130846, 'elektrikli': 0.111911},
-    (22, 'mustakil', 'KIR'): {'kombi': 0.757243, 'merkezi': 0.000000, 'soba': 0.171189, 'elektrikli': 0.071568},
-    (39, 'apartman', 'YOĞUN KENT'): {'kombi': 0.613725, 'merkezi': 0.386275, 'soba': 0.000000, 'elektrikli': 0.000000},
-    (39, 'apartman', 'ORTA YOĞUN KENT'): {'kombi': 0.735314, 'merkezi': 0.264686, 'soba': 0.000000, 'elektrikli': 0.000000},
-    (39, 'apartman', 'KIR'): {'kombi': 0.883321, 'merkezi': 0.116679, 'soba': 0.000000, 'elektrikli': 0.000000},
-    (39, 'mustakil', 'YOĞUN KENT'): {'kombi': 1.000000, 'merkezi': 0.000000, 'soba': 0.000000, 'elektrikli': 0.000000},
-    (39, 'mustakil', 'ORTA YOĞUN KENT'): {'kombi': 1.000000, 'merkezi': 0.000000, 'soba': 0.000000, 'elektrikli': 0.000000},
-    (39, 'mustakil', 'KIR'): {'kombi': 1.000000, 'merkezi': 0.000000, 'soba': 0.000000, 'elektrikli': 0.000000},
-    (11, 'apartman', 'YOĞUN KENT'): {'kombi': 0.441343, 'merkezi': 0.277152, 'soba': 0.058539, 'elektrikli': 0.222966},
-    (11, 'apartman', 'ORTA YOĞUN KENT'): {'kombi': 0.532862, 'merkezi': 0.185633, 'soba': 0.112844, 'elektrikli': 0.168662},
-    (11, 'apartman', 'KIR'): {'kombi': 0.640366, 'merkezi': 0.078129, 'soba': 0.178110, 'elektrikli': 0.103395},
-    (11, 'mustakil', 'YOĞUN KENT'): {'kombi': 0.718495, 'merkezi': 0.000000, 'soba': 0.075838, 'elektrikli': 0.205667},
-    (11, 'mustakil', 'ORTA YOĞUN KENT'): {'kombi': 0.718495, 'merkezi': 0.000000, 'soba': 0.152978, 'elektrikli': 0.128528},
-    (11, 'mustakil', 'KIR'): {'kombi': 0.718495, 'merkezi': 0.000000, 'soba': 0.202278, 'elektrikli': 0.079227},
+# B — yoğunluk ağırlıkları (# VARSAYIM): şebeke yoğun yerleşime önce ulaşır. apartman,
+# aynı kent_kir sınıfındaki müstakilden HER ZAMAN daha yoğun kabul edilir. İl-içi hedefe
+# ulaşırken (eski_gaz_payı + toplam_boşluk × bu_hücrenin_ağırlığı/il_ağırlıklı_ortalaması)
+# formülüyle uygulanır — bkz. src/assign_attributes.py yorumunda formülün tam hali.
+DENSITY_AGIRLIK = {
+    ('apartman', 'YOĞUN KENT'): 1.6,
+    ('apartman', 'ORTA YOĞUN KENT'): 1.2,
+    ('apartman', 'KIR'): 0.7,
+    ('mustakil', 'YOĞUN KENT'): 1.0,
+    ('mustakil', 'ORTA YOĞUN KENT'): 0.6,
+    ('mustakil', 'KIR'): 0.3,
 }
 
-# (ilce_kayit_no, kent_kir) -> oranlar — YALNIZ İstanbul apartman (merkezi ısıtma zaten
-# yalnız apartmanda tanımlı). Kaynak: data/igdas/ilce_kullanim_sinifi_2025.csv, kombi/
-# merkezi payı sınıf adı temelinde ('KOMBİ' -> kombi, 'MERKEZ' -> merkezi, ikisi de yoksa
-# 'diğer' = gaz var ama ısıtma başka); diğer'in soba/elektrikli'ye bölüşümü, o (ilçe,
-# kent_kir) hücresinin ESKİ soba:elektrikli oranıyla korunur (# VARSAYIM — İGDAŞ bu ikisini
-# ayırmıyor). 39/39 ilçe eşleşti.
+# (il_kodu, konut_tipi, kent_kir) -> oranlar. İstanbul-apartman satırları burada YOK —
+# ISITMA_TIPI_ORANLARI_ISTANBUL_ILCE bunları ilçe çözünürlüğünde geçersiz kılar.
+ISITMA_TIPI_ORANLARI_IL = {
+    (34, 'mustakil', 'YOĞUN KENT'): {'kombi': 1.000000, 'merkezi': 0.000000, 'soba': 0.000000, 'elektrikli': 0.000000},
+    (34, 'mustakil', 'ORTA YOĞUN KENT'): {'kombi': 0.714687, 'merkezi': 0.000000, 'soba': 0.152467, 'elektrikli': 0.132846},
+    (34, 'mustakil', 'KIR'): {'kombi': 0.331895, 'merkezi': 0.000000, 'soba': 0.471374, 'elektrikli': 0.196731},
+    (41, 'apartman', 'YOĞUN KENT'): {'kombi': 0.612140, 'merkezi': 0.387860, 'soba': 0.000000, 'elektrikli': 0.000000},
+    (41, 'apartman', 'ORTA YOĞUN KENT'): {'kombi': 0.652070, 'merkezi': 0.239864, 'soba': 0.043532, 'elektrikli': 0.064534},
+    (41, 'apartman', 'KIR'): {'kombi': 0.465407, 'merkezi': 0.066276, 'soba': 0.296410, 'elektrikli': 0.171907},
+    (41, 'mustakil', 'YOĞUN KENT'): {'kombi': 0.568763, 'merkezi': 0.000000, 'soba': 0.116265, 'elektrikli': 0.314972},
+    (41, 'mustakil', 'ORTA YOĞUN KENT'): {'kombi': 0.418706, 'merkezi': 0.000000, 'soba': 0.310757, 'elektrikli': 0.270537},
+    (41, 'mustakil', 'KIR'): {'kombi': 0.184351, 'merkezi': 0.000000, 'soba': 0.574570, 'elektrikli': 0.241079},
+    (54, 'apartman', 'YOĞUN KENT'): {'kombi': 0.612503, 'merkezi': 0.387497, 'soba': 0.000000, 'elektrikli': 0.000000},
+    (54, 'apartman', 'ORTA YOĞUN KENT'): {'kombi': 0.678519, 'merkezi': 0.247900, 'soba': 0.029306, 'elektrikli': 0.044275},
+    (54, 'apartman', 'KIR'): {'kombi': 0.489922, 'merkezi': 0.062788, 'soba': 0.284596, 'elektrikli': 0.162694},
+    (54, 'mustakil', 'YOĞUN KENT'): {'kombi': 0.595049, 'merkezi': 0.000000, 'soba': 0.109832, 'elektrikli': 0.295119},
+    (54, 'mustakil', 'ORTA YOĞUN KENT'): {'kombi': 0.438088, 'merkezi': 0.000000, 'soba': 0.301954, 'elektrikli': 0.259959},
+    (54, 'mustakil', 'KIR'): {'kombi': 0.195598, 'merkezi': 0.000000, 'soba': 0.570435, 'elektrikli': 0.233967},
+    (16, 'apartman', 'YOĞUN KENT'): {'kombi': 0.611491, 'merkezi': 0.388509, 'soba': 0.000000, 'elektrikli': 0.000000},
+    (16, 'apartman', 'ORTA YOĞUN KENT'): {'kombi': 0.616521, 'merkezi': 0.225873, 'soba': 0.061715, 'elektrikli': 0.095891},
+    (16, 'apartman', 'KIR'): {'kombi': 0.444751, 'merkezi': 0.055098, 'soba': 0.318664, 'elektrikli': 0.181487},
+    (16, 'mustakil', 'YOĞUN KENT'): {'kombi': 0.528380, 'merkezi': 0.000000, 'soba': 0.128029, 'elektrikli': 0.343591},
+    (16, 'mustakil', 'ORTA YOĞUN KENT'): {'kombi': 0.390069, 'merkezi': 0.000000, 'soba': 0.324491, 'elektrikli': 0.285440},
+    (16, 'mustakil', 'KIR'): {'kombi': 0.171498, 'merkezi': 0.000000, 'soba': 0.584471, 'elektrikli': 0.244031},
+    (10, 'apartman', 'YOĞUN KENT'): {'kombi': 0.377363, 'merkezi': 0.239908, 'soba': 0.074817, 'elektrikli': 0.307913},
+    (10, 'apartman', 'ORTA YOĞUN KENT'): {'kombi': 0.395290, 'merkezi': 0.142544, 'soba': 0.184310, 'elektrikli': 0.277855},
+    (10, 'apartman', 'KIR'): {'kombi': 0.285362, 'merkezi': 0.037297, 'soba': 0.425814, 'elektrikli': 0.251526},
+    (10, 'mustakil', 'YOĞUN KENT'): {'kombi': 0.281471, 'merkezi': 0.000000, 'soba': 0.192814, 'elektrikli': 0.525715},
+    (10, 'mustakil', 'ORTA YOĞUN KENT'): {'kombi': 0.244791, 'merkezi': 0.000000, 'soba': 0.407356, 'elektrikli': 0.347853},
+    (10, 'mustakil', 'KIR'): {'kombi': 0.097993, 'merkezi': 0.000000, 'soba': 0.636168, 'elektrikli': 0.265839},
+    (17, 'apartman', 'YOĞUN KENT'): {'kombi': 0.424757, 'merkezi': 0.270469, 'soba': 0.059797, 'elektrikli': 0.244977},
+    (17, 'apartman', 'ORTA YOĞUN KENT'): {'kombi': 0.436344, 'merkezi': 0.159836, 'soba': 0.164673, 'elektrikli': 0.239147},
+    (17, 'apartman', 'KIR'): {'kombi': 0.320432, 'merkezi': 0.039226, 'soba': 0.409397, 'elektrikli': 0.230946},
+    (17, 'mustakil', 'YOĞUN KENT'): {'kombi': 0.317465, 'merkezi': 0.000000, 'soba': 0.167113, 'elektrikli': 0.515422},
+    (17, 'mustakil', 'ORTA YOĞUN KENT'): {'kombi': 0.270356, 'merkezi': 0.000000, 'soba': 0.394683, 'elektrikli': 0.334961},
+    (17, 'mustakil', 'KIR'): {'kombi': 0.109167, 'merkezi': 0.000000, 'soba': 0.629534, 'elektrikli': 0.261299},
+    (77, 'apartman', 'YOĞUN KENT'): {'kombi': 0.614165, 'merkezi': 0.385835, 'soba': 0.000000, 'elektrikli': 0.000000},
+    (77, 'apartman', 'ORTA YOĞUN KENT'): {'kombi': 0.652221, 'merkezi': 0.232419, 'soba': 0.046260, 'elektrikli': 0.069100},
+    (77, 'apartman', 'KIR'): {'kombi': 0.462531, 'merkezi': 0.052431, 'soba': 0.308069, 'elektrikli': 0.176969},
+    (77, 'mustakil', 'YOĞUN KENT'): {'kombi': 0.556453, 'merkezi': 0.000000, 'soba': 0.125836, 'elektrikli': 0.317711},
+    (77, 'mustakil', 'ORTA YOĞUN KENT'): {'kombi': 0.417005, 'merkezi': 0.000000, 'soba': 0.315200, 'elektrikli': 0.267795},
+    (77, 'mustakil', 'KIR'): {'kombi': 0.184708, 'merkezi': 0.000000, 'soba': 0.579948, 'elektrikli': 0.235344},
+    (59, 'apartman', 'YOĞUN KENT'): {'kombi': 0.565955, 'merkezi': 0.363093, 'soba': 0.014183, 'elektrikli': 0.056770},
+    (59, 'apartman', 'ORTA YOĞUN KENT'): {'kombi': 0.564056, 'merkezi': 0.209604, 'soba': 0.092052, 'elektrikli': 0.134288},
+    (59, 'apartman', 'KIR'): {'kombi': 0.417374, 'merkezi': 0.048479, 'soba': 0.336435, 'elektrikli': 0.197712},
+    (59, 'mustakil', 'YOĞUN KENT'): {'kombi': 0.469401, 'merkezi': 0.000000, 'soba': 0.147013, 'elektrikli': 0.383585},
+    (59, 'mustakil', 'ORTA YOĞUN KENT'): {'kombi': 0.363413, 'merkezi': 0.000000, 'soba': 0.344064, 'elektrikli': 0.292524},
+    (59, 'mustakil', 'KIR'): {'kombi': 0.156738, 'merkezi': 0.000000, 'soba': 0.597544, 'elektrikli': 0.245719},
+    (22, 'apartman', 'YOĞUN KENT'): {'kombi': 0.610435, 'merkezi': 0.389565, 'soba': 0.000000, 'elektrikli': 0.000000},
+    (22, 'apartman', 'ORTA YOĞUN KENT'): {'kombi': 0.634127, 'merkezi': 0.226790, 'soba': 0.055126, 'elektrikli': 0.083956},
+    (22, 'apartman', 'KIR'): {'kombi': 0.465335, 'merkezi': 0.060503, 'soba': 0.308180, 'elektrikli': 0.165982},
+    (22, 'mustakil', 'YOĞUN KENT'): {'kombi': 0.550999, 'merkezi': 0.000000, 'soba': 0.119630, 'elektrikli': 0.329370},
+    (22, 'mustakil', 'ORTA YOĞUN KENT'): {'kombi': 0.411029, 'merkezi': 0.000000, 'soba': 0.317456, 'elektrikli': 0.271515},
+    (22, 'mustakil', 'KIR'): {'kombi': 0.176435, 'merkezi': 0.000000, 'soba': 0.580767, 'elektrikli': 0.242798},
+    (39, 'apartman', 'YOĞUN KENT'): {'kombi': 0.613725, 'merkezi': 0.386275, 'soba': 0.000000, 'elektrikli': 0.000000},
+    (39, 'apartman', 'ORTA YOĞUN KENT'): {'kombi': 0.735314, 'merkezi': 0.264686, 'soba': 0.000000, 'elektrikli': 0.000000},
+    (39, 'apartman', 'KIR'): {'kombi': 0.571980, 'merkezi': 0.075553, 'soba': 0.222734, 'elektrikli': 0.129733},
+    (39, 'mustakil', 'YOĞUN KENT'): {'kombi': 0.722101, 'merkezi': 0.000000, 'soba': 0.076248, 'elektrikli': 0.201651},
+    (39, 'mustakil', 'ORTA YOĞUN KENT'): {'kombi': 0.524375, 'merkezi': 0.000000, 'soba': 0.258356, 'elektrikli': 0.217269},
+    (39, 'mustakil', 'KIR'): {'kombi': 0.235695, 'merkezi': 0.000000, 'soba': 0.536917, 'elektrikli': 0.227388},
+    (11, 'apartman', 'YOĞUN KENT'): {'kombi': 0.568981, 'merkezi': 0.357304, 'soba': 0.015329, 'elektrikli': 0.058386},
+    (11, 'apartman', 'ORTA YOĞUN KENT'): {'kombi': 0.575574, 'merkezi': 0.200513, 'soba': 0.089757, 'elektrikli': 0.134156},
+    (11, 'apartman', 'KIR'): {'kombi': 0.407642, 'merkezi': 0.049735, 'soba': 0.343322, 'elektrikli': 0.199301},
+    (11, 'mustakil', 'YOĞUN KENT'): {'kombi': 0.460442, 'merkezi': 0.000000, 'soba': 0.145358, 'elektrikli': 0.394200},
+    (11, 'mustakil', 'ORTA YOĞUN KENT'): {'kombi': 0.373442, 'merkezi': 0.000000, 'soba': 0.340489, 'elektrikli': 0.286070},
+    (11, 'mustakil', 'KIR'): {'kombi': 0.155139, 'merkezi': 0.000000, 'soba': 0.607082, 'elektrikli': 0.237779},
+}
+
+# (ilce_kayit_no, kent_kir) -> oranlar — YALNIZ İstanbul apartman. DEĞİŞMEDİ (A/B
+# yalnız Katman 1'i etkiliyor). Kaynak: data/igdas/ilce_kullanim_sinifi_2025.csv.
 ISITMA_TIPI_ORANLARI_ISTANBUL_ILCE = {
     (1103, 'ORTA YOĞUN KENT'): {'kombi': 0.968388, 'merkezi': 0.002718, 'soba': 0.011643, 'elektrikli': 0.017251},  # ADALAR
     (1103, 'KIR'): {'kombi': 0.968388, 'merkezi': 0.002718, 'soba': 0.018189, 'elektrikli': 0.010704},  # ADALAR
@@ -195,6 +208,7 @@ ISITMA_TIPI_ORANLARI_ISTANBUL_ILCE = {
     (1659, 'KIR'): {'kombi': 0.965864, 'merkezi': 0.017670, 'soba': 0.010510, 'elektrikli': 0.005956},  # ŞİLE
     (1663, 'YOĞUN KENT'): {'kombi': 0.906999, 'merkezi': 0.082775, 'soba': 0.002072, 'elektrikli': 0.008155},  # ŞİŞLİ
 }
+
 
 # --- 7.4 Klima sahipliği — gelir vekili olarak KENT-KIR + hane büyüklüğü ----------
 # Gerçek kaynak önerisi: TÜİK Hanehalkı Bütçe Anketi (dayanıklı tüketim malı sahipliği).

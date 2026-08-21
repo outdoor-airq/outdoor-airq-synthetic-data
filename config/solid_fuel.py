@@ -8,18 +8,24 @@ toplamda TÜİK 2022'nin ulusal ısıtma-yakıtı payına (kömür %21,6, katı 
 yani kömür payı %21,6/(%21,6+%16,9) = %56,1) yaklaşık dönmeli.
 
 `# VARSAYIM` — il bazlı kaynak yok (yönerge §4.5, seviye katmanının zaten en zayıf halkası
-olduğu kabul edilmiş kısım). KENT/KIR oranları, mevcut soba popülasyonunun (Karar 4
-düzeltmesi sonrası) kent_kir dağılımına göre toplamda %56,1'e en yakın düşecek şekilde elle
-seçildi (KENT=0.70, KIR=0.28 -> ağırlıklı ortalama %56,0 — TÜİK hedefine ±0,1 puan). Brentq
-gibi bir çözücü kullanılmadı çünkü tek bir doğrusal denklem (iki değişken, tek serbestlik
-derecesi KENT sabitlenince KIR için kapalı form) — Adım 1'in λ çözümüyle aynı sınıf problem
-değil.
+olduğu kabul edilmiş kısım). KENT/KIR oranları, mevcut soba popülasyonunun kent_kir
+dağılımına göre toplamda %56,1'e en yakın düşecek şekilde elle seçildi; KENT=0.70 sabit
+tutulup KIR için kapalı form çözüldü (tek doğrusal denklem, brentq gerekmiyor).
+
+**2026-08-21 — Karar 4'ün A/B revizyonundan sonra yeniden kalibre edildi.** A/B (gaz payı
+tavanı + yoğunluk ağırlıklı yeniden dağıtım) soba popülasyonunun büyüklüğünü VE kent_kir
+dağılımını değiştirdi (296.564 → 486.046 hane, KIR payı arttı) — eski KIR=0.28 artık toplamda
+%46,3 kömür veriyordu (hedef %56,1'den 9,8 puan sapma). KENT=0.70 sabit tutulup KIR yeniden
+çözüldü: KIR=0.4551 → ağırlıklı ortalama %56,1 (hedefe tam). Bu, KIR'ın hâlâ KENT'ten daha
+odun ağırlıklı olduğu niteliğini koruyor (odun payı KIR'da %54,5, KENT'te %30) ama fark
+öncekinden (KENT 0.70/KIR 0.28) daha küçük — soba popülasyonunun artık daha KIR ağırlıklı
+olması (%56,7) bunu gerektiriyor.
 """
 
 FUEL_TYPE_KOMUR_ORANI = {
     'YOĞUN KENT': 0.70,
     'ORTA YOĞUN KENT': 0.70,
-    'KIR': 0.28,
+    'KIR': 0.4551,
 }
 
 assert all(0.0 <= v <= 1.0 for v in FUEL_TYPE_KOMUR_ORANI.values()), "kömür oranı [0,1] dışında"

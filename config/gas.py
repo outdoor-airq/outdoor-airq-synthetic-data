@@ -125,8 +125,14 @@ BUILDING_CLASS = 11  # demandlib'in bina yaşı sınıflarını (1-10) özetleye
 
 # Kombi havuzunun konut tipi karışımı — Marmara ortalaması, düz uygulanıyor (yönerge Ek
 # A.2/A.4: bölgesel kırılıma geçmek elle kurulmuş bantlara fit etmek olurdu, reddedildi).
-EFH_PAY = 0.0934   # müstakil (Einfamilienhaus)
-MFH_PAY = 0.9066   # apartman (Mehrfamilienhaus)
+#
+# 2026-08-21 — Karar 4'ün A/B revizyonundan sonra households.parquet'ten YENİDEN ÖLÇÜLDÜ
+# (Faz 2 spike'ının %9,34/%90,66'sı Karar 4 ÖNCESİNİN popülasyonundandı, artık geçersiz).
+# B'nin yoğunluk-ağırlıklı yeniden dağıtımı, müstakil payını ilk (B'siz) düzeltmenin ürettiği
+# aşırı değerden (%16,18) neredeyse orijinaline (%9,34) geri getirdi — B'nin niyet ettiği
+# etkinin dolaylı bir doğrulaması.
+EFH_PAY = 0.1068   # müstakil (Einfamilienhaus)
+MFH_PAY = 0.8932   # apartman (Mehrfamilienhaus)
 assert abs(EFH_PAY + MFH_PAY - 1.0) < 1e-9, "EFH_PAY + MFH_PAY toplamı 1 değil"
 
 
