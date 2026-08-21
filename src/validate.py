@@ -233,7 +233,7 @@ if __name__ == "__main__":
         kent_kir_il = np.repeat(grup['kent_kir'].to_numpy(), grup['hane_sayisi'].to_numpy())
 
         konut = ata_konut_tipi(rng, kent_kir_il)
-        isitma = ata_isitma_tipi(rng, konut, kent_kir_il)
+        isitma = ata_isitma_tipi(rng, il_kodu, ilce_kayit_no, konut, kent_kir_il)
         carpan = ata_base_multiplier(rng, n_il)
         carpan = carpan / carpan.mean()
         has_ac = ata_has_ac(rng, kent_kir_il, size)

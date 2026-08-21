@@ -491,10 +491,12 @@ geliyor, varsayımdan değil:
 `building_class=11`, `demandlib`'in bina yaşı sınıflarını (1–10) özetleyen temsili sınıfıdır
 — il/yaş bazlı ayrım yapılmıyor, `# VARSAYIM`.
 
-Kombi havuzunda: apartman 3.990.483 (%90,7), müstakil 411.077 (%9,3). Bölgeye göre müstakil
-payı %7,13 (AYEDAŞ) – %13,28 (Trakya EDAŞ). Spike'ta bu bölgesel kırılım kullanılmadı, Marmara
-ortalaması (%9,34 EFH / %90,66 MFH) düz uygulandı — kalıcı modülde de aynı basitleştirme
-kullanılacak (Ek A.2, gerekçe Ek A.4'te).
+Kombi havuzunda (Faz 2 spike zamanındaki, **Karar 4 öncesi** popülasyonla): apartman
+3.990.483 (%90,7), müstakil 411.077 (%9,3). Bölgeye göre müstakil payı %7,13 (AYEDAŞ) –
+%13,28 (Trakya EDAŞ). Spike'ta bu bölgesel kırılım kullanılmadı, Marmara ortalaması (%9,34
+EFH / %90,66 MFH) düz uygulandı. **Karar 4'ün popülasyon düzeltmesinden sonra (2026-08-21)
+bu sayılar değişti — müstakil payı artık %16,18 (Ek A.2) — `EFH_PAY`/`MFH_PAY`
+`config/gas.py`'da HENÜZ güncellenmedi, `build_gas_calibration.py`'dan önce yapılmalı.**
 
 **Gün tipi faktörü = 1,0.** BDEW konut profillerinde haftaiçi/haftasonu ayrımı yoktur.
 Elektrikteki `HOURLY_SHAPE_WEEKDAY`/`WEEKEND` ayrımının gaz konutunda karşılığı yok —
@@ -766,7 +768,7 @@ döner, her madde `OK` / `FARKLI` etiketiyle ayrı yazdırılır.
 | 13 | `gunluk_hane_m3 > 0`, NaN/inf yok; makullük bandı 0,3 – 12 m³/gün (hane başı, `# VARSAYIM`) |
 | 14 | **Ölçek çapraz kontrolü:** Ocak `gunluk_hane_kwh × 31`, aynı ayın elektrik `ortalama_hane_kwh` toplamının 5–10 katı (§4.6) |
 | 15 | **Abone tutarlılığı:** §4.4 ile çözülen `penetrasyon(il)` ∈ [0,7 , 1,0]; bant dışı iller tek tek listeleniyor |
-| 16 | `Σ kombi_hane` = **4.401.560**, `Σ soba_hane` = **660.949** — `households.parquet` ile tam eşitlik, tolerans yok |
+| 16 | `Σ kombi_hane` = **6.396.834**, `Σ soba_hane` = **296.564** — `households.parquet` ile tam eşitlik, tolerans yok (Karar 4 düzeltmesi sonrası sayılar, 2026-08-21; eski sayılar 4.401.560/660.949'du) |
 | 17 | Üç provenance kolonu hiçbir satırda NULL/boş değil; hangi satırın hangi kaynaktan geldiği sayılarla yazdırılıyor |
 | 18 | `households.parquet` değişmedi (dosya hash'i koşu öncesi/sonrası aynı); çıktı dosyaları < 5 MB — **bu adımda hane bazlı veri üretilmediğinin güvencesi** |
 | 19 | **Bölüntü testi (Karar 4 popülasyon düzeltmesi için, 2026-08-20 eklendi, 2026-08-21 iki kez düzeltildi — önce birim hatası, sonra totoloji):** `kombi_hane(il) + merkezi_hane(il) + soba_hane(il) + elektrikli_hane(il) == toplam_hane(il)` (tam eşitlik, tolerans yok) ve her kategori `≥ 0`. **Önceki hal (`kombi+merkezi ≤ toplam`) totolojikti** — `isitma_tipi` zaten hanelerin bir bölüntüsü olduğu için mevcut popülasyonla asla başarısız olamazdı, hiçbir şey yakalamıyordu. Bu hal Karar 4 düzeltmesinin en olası uygulama hatasını yakalar: bir kategoriyi (örn. kombiyi) çarpanla büyütüp diğerlerini aynı oranda küçültmeyi unutmak — toplam hane sayısı sessizce 8.529.528 olmaktan çıkar. Düzeltme bir yeniden dağıtım olmak ZORUNDADIR, yalnız bir kategoriye ekleme değil |
@@ -800,8 +802,9 @@ kurulduğu için, hane bazında kendi profiline geçilince toplam kayar.
 
 Bu, Adım 3'ün `düzeltme(bölge, ay) = 1 / (1 + AC_DELTA[ay] × w_bölge)` analitik telafisinin
 birebir muadilidir ve aynı şekilde **statik sabitlerle** çözülmelidir: müstakil payı
-(`%7,13 – %13,28`, bölge bazında, Ek A) popülasyonun donmuş bir özelliğidir, koşu anında
-hesaplanmayacaktır. Canlı yayında `energy-publisher` bölge toplamını bilmek zorunda kalmaz.
+(bölge bazında, Ek A.2 — **Karar 4 sonrası %10,3–%32,7**, eski %7,13–%13,28 değil)
+popülasyonun donmuş bir özelliğidir, koşu anında hesaplanmayacaktır. Canlı yayında
+`energy-publisher` bölge toplamını bilmek zorunda kalmaz.
 
 ---
 
@@ -944,38 +947,42 @@ belgelenmiş olmasıdır.
 Aşağıdakiler `data/generated/households.parquet` (8.529.528 satır) üzerinde ve BDEW formülü
 üzerinde **ölçülmüştür**, tahmin değildir. Doğrulama maddeleri 3, 4, 15, 16 bunları tekrar eder.
 
-### A.1 Isıtma tipi × bölge
+### A.1 Isıtma tipi × bölge — **Karar 4 düzeltmesi sonrası (2026-08-21)**
+
+> Bu tablo Karar 4'ün popülasyon düzeltmesiyle güncellendi. Eski (düzeltme öncesi) sayılar
+> `docs/PROGRESS.md`'de kayıtlı, burada tekrar edilmiyor — bu artık `households.parquet`'in
+> GERÇEK içeriği, tarihsel referans değil.
 
 | bölge | kombi | merkezi | soba | elektrikli | toplam |
 |---|---|---|---|---|---|
-| BEDAŞ | 1.687.269 | 981.913 | 125.495 | 344.654 | 3.139.331 |
-| AYEDAŞ | 956.018 | 559.780 | 68.549 | 194.081 | 1.778.428 |
-| SEDAŞ | 506.171 | 255.356 | 110.279 | 139.374 | 1.011.180 |
-| UEDAŞ | 890.539 | 439.685 | 247.080 | 265.035 | 1.842.339 |
-| Trakya EDAŞ | 361.563 | 176.970 | 109.546 | 110.171 | 758.250 |
-| **toplam** | **4.401.560** | **2.413.704** | **660.949** | **1.053.315** | **8.529.528** |
+| BEDAŞ | 2.770.550 | 256.439 | 23.611 | 88.731 | 3.139.331 |
+| AYEDAŞ | 1.562.125 | 190.007 | 5.571 | 20.725 | 1.778.428 |
+| SEDAŞ | 663.890 | 273.659 | 26.700 | 46.931 | 1.011.180 |
+| UEDAŞ | 950.128 | 386.258 | 193.409 | 312.544 | 1.842.339 |
+| Trakya EDAŞ | 450.141 | 163.669 | 47.273 | 97.167 | 758.250 |
+| **toplam** | **6.396.834** | **1.270.032** | **296.564** | **566.098** | **8.529.528** |
 
-İl bazında kombi: İstanbul 2.643.287 · Bursa 535.289 · Kocaeli 346.788 · Balıkesir 212.219 ·
-Tekirdağ 196.653 · Sakarya 159.383 · Çanakkale 92.043 · Edirne 67.041 · Kırklareli 61.124 ·
-Yalova 50.988 · Bilecik 36.745.
+İl bazında kombi: İstanbul 4.332.675 · Bursa 641.681 · Kocaeli 445.183 · Tekirdağ 216.654 ·
+Sakarya 218.707 · Kırklareli 104.445 · Balıkesir 163.032 · Edirne 87.370 · Çanakkale 79.427 ·
+Yalova 65.988 · Bilecik 41.672.
 
-### A.2 Kombi havuzunun konut tipi karışımı (`demandlib` EFH/MFH profil ağırlıkları)
+### A.2 Kombi havuzunun konut tipi karışımı — **Karar 4 düzeltmesi sonrası**
 
-| bölge | apartman (MFH) | müstakil (EFH) | müstakil payı |
+| bölge | apartman | müstakil | müstakil payı |
 |---|---|---|---|
-| BEDAŞ | 1.564.742 | 122.527 | %7,26 |
-| AYEDAŞ | 887.833 | 68.185 | %7,13 |
-| SEDAŞ | 447.029 | 59.142 | %11,68 |
-| UEDAŞ | 777.335 | 113.204 | %12,71 |
-| Trakya EDAŞ | 313.544 | 48.019 | %13,28 |
-| **toplam** | **3.990.483** | **411.077** | **%9,34** |
+| BEDAŞ | 2.479.060 | 291.490 | %10,52 |
+| AYEDAŞ | 1.400.685 | 161.440 | %10,33 |
+| SEDAŞ | 490.573 | 173.317 | %26,11 |
+| UEDAŞ | 688.474 | 261.654 | %27,54 |
+| Trakya EDAŞ | 302.994 | 147.147 | %32,69 |
+| **toplam** | **5.361.786** | **1.035.048** | **%16,18** |
 
-Merkezi ısıtmanın tamamı apartman (Adım 1 doğrulama #15 gereği). Bu bölgesel kırılım Faz 2
-spike'ında kullanılmadı — kalibrasyonda düz Marmara ortalaması (%9,34/%90,66) uygulandı,
-çünkü toplamı hane ağırlıklı olarak zaten aynı sayıyı verir ve bölgesel ayrıma geçmek,
-sonucu elle kurulmuş bantlara yaklaştırmak için parametre aramak anlamına gelirdi (reddedildi,
-§4.2.2). `demandlib`'de her ilin kendi `wind_class`'ı yok, tek bir Marmara-geneli seçim var
-(§4.2.2).
+Merkezi ısıtmanın tamamı apartman (Adım 1 doğrulama #15 gereği). **Önemli — sonraki adım için
+not:** Faz 2 spike'ının `config/gas.py::EFH_PAY/MFH_PAY` sabitleri (%9,34/%90,66) bu düzeltme
+ÖNCESİNİN kombi havuzundan geliyordu; müstakil payı artık %16,18 — belirgin şekilde farklı,
+çünkü Karar 4'ün il-bazlı düzeltmesi kombi havuzuna görece daha kırsal/müstakil ağırlıklı
+iller de kattı. **`build_gas_calibration.py` yazılmadan önce `EFH_PAY`/`MFH_PAY` bu yeni
+sayılarla yeniden hesaplanmalı** — bu turda YAPILMADI, açık iş olarak kayıtlı.
 
 ### A.3 İşaret testi — Faz 2 spike sonucu (2026-08-20, `demandlib` gerçek katsayılarıyla)
 
@@ -1033,26 +1040,39 @@ Merkezi haneleri abone sayan naif hesap: 5.608.412 – 6.091.153 → **%26–37 
 Seviye katmanına etkisi: abone başına ortalama = kombi dairesinin **1,26–1,36 katı** →
 GAZBİR'in 154,6 m³'ü abone başınaysa gerçek kombi dairesi **114–122 m³**.
 
-### A.6 `ISITMA_TIPI_ORANLARI` düzeltmesinin patlama yarıçapı (Karar 4)
+### A.6 `ISITMA_TIPI_ORANLARI` düzeltmesinin patlama yarıçapı (Karar 4) — **EMPİRİK OLARAK DOĞRULANDI (2026-08-21)**
 
-`numpy.random.Generator.choice`, olasılık vektörü değişse de **aynı sayıda** uniform tüketir.
-Aynı tohumla iki farklı olasılık vektörü denendi:
+Önceki tur bu bölümde teorik bir küçük-ölçek testi anlatıyordu (yalnız (konut,kent_kir)
+düzeyinde p-vektörü değişimi). **Gerçek Karar 4 düzeltmesi çok daha büyük bir yapısal
+değişiklik gerektirdi** — `ata_isitma_tipi` artık tek büyük `rng.choice` çağrısı yerine
+il/ilçe bazında onlarca küçük çağrı yapıyor (İstanbul'da 39 ilçe × kent_kir). Bu, Ek A.6'nın
+orijinal iddiasından (yalnız p değişimi) daha güçlü bir koşuldur — TOPLAM `rng.choice` çağrı
+SAYISI da değişti, yalnız değerleri değil. Tam popülasyon (8.529.528 hane) üzerinde gerçek
+regenerasyonla test edildi:
 
 ```
-isitma_tipi aynı mı            : False   (beklenen — düzeltmenin amacı bu)
-base_multiplier bit-bit aynı mı: True
-has_ac uniform akışı aynı mı   : True
+base_multiplier bit-bit aynı mı (households.parquet'in TAMAMI): True
+has_ac bit-bit aynı mı (households.parquet'in TAMAMI)         : True
+isitma_tipi değişen hane sayısı                                : 3.411.319 / 8.529.528 (%40)
 ```
 
-Sonuç: düzeltme yalnız `isitma_tipi` kolonunu değiştirir. Adım 2'nin `hane_sayisi`'ları ve
-Adım 3'ün `w_bölge` sabitleri etkilenmez; `households_marmara` yeniden yüklenir.
+Sonuç doğrulandı: `Generator.choice(p=...)` her zaman `size` kadar ham çekiliş tüketir, kaç
+ayrı çağrıya bölündüğünden bağımsız — TOPLAM `size` (bir ilin toplam hane sayısı) sabit
+kaldığı sürece, isitma_tipi sonrası gelen `base_multiplier`/`has_ac` adımları RNG akışında
+aynı noktadan devam ediyor. Adım 3'ün `w_bölge` sabitleri bu nedenle etkilenmedi.
 
-### A.7 Hacim (Karar 3)
+**Ayrıca eklenen adım — `fuel_type` (Karar 5, aynı koşuda):** `ata_fuel_type` RNG sırasının
+EN SONUNA (has_ac'tan sonra) eklendi, böylece ondan önceki hiçbir çekilişi etkilemedi —
+yukarıdaki bit-bit korunum buna rağmen geçerli kaldı (fuel_type eklenmeden ÖNCE ayrıca
+doğrulandı, sonra tekrar).
 
-| | elektrik (8.529.528 hane) | gaz (4.401.560 kombi) |
+### A.7 Hacim (Karar 3) — **Karar 4 sonrası kombi sayısıyla güncellendi**
+
+| | elektrik (8.529.528 hane) | gaz (6.396.834 kombi, **eskiden 4.401.560**) |
 |---|---|---|
-| 7 günlük sıcak pencere, saatlik | ~1,43 milyar satır | ~0,74 milyar satır (**+%52**) |
-| 3 ay, saatlik | ~18,6 milyar | ~9,6 milyar |
-| 3 ay, günlük | — | ~400 milyon (**24× az**) |
+| 7 günlük sıcak pencere, saatlik | ~1,43 milyar satır | ~1,08 milyar satır (**+%75**, eskiden +%52) |
+| 3 ay, saatlik | ~18,6 milyar | ~13,9 milyar |
+| 3 ay, günlük | — | ~583 milyon |
 
-Kalibrasyon artefaktının kendisi: 11 il × 365 gün = **4.015 satır**.
+Kalibrasyon artefaktının kendisi değişmedi: 11 il × 365 gün = **4.015 satır** (bu, kombi
+sayısından bağımsız — il×gün granülerliği).

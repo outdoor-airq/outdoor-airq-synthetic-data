@@ -10,7 +10,13 @@ gerek kalmaz. Büyüklük/tip dağılımı yerleşime değil ile bağlı: örnek
 import numpy as np
 from scipy.optimize import brentq
 
-from config.housing_profiles import HAS_AC_TABAN_ORAN, ISITMA_TIPI_ORANLARI, KONUT_TIPI_ORANLARI
+from config.housing_profiles import (
+    HAS_AC_TABAN_ORAN,
+    ISITMA_TIPI_ORANLARI_IL,
+    ISITMA_TIPI_ORANLARI_ISTANBUL_ILCE,
+    KONUT_TIPI_ORANLARI,
+)
+from config.solid_fuel import FUEL_TYPE_KOMUR_ORANI
 from src.load_tuik import BUYUKLUK_KATEGORILERI, HOUSEHOLD_TYPES_ORDERED
 
 K = np.array([1, 2, 3, 4, 5, 6, 7.8])
@@ -94,14 +100,47 @@ def ata_konut_tipi(rng, kent_kir: np.ndarray) -> np.ndarray:
     return konut
 
 
-def ata_isitma_tipi(rng, konut_tipi: np.ndarray, kent_kir: np.ndarray) -> np.ndarray:
+def ata_isitma_tipi(
+    rng, il_kodu: int, ilce_kayit_no: np.ndarray, konut_tipi: np.ndarray, kent_kir: np.ndarray
+) -> np.ndarray:
+    """Adım 2b Karar 4 düzeltmesi (2026-08-21, `ISITMA_TIPI_ORANLARI` düzeltmesi istisnası
+    kapsamında — bkz. adim-02b-dogalgaz-kati-yakit-yonergesi.md §0.2/§9): il bazlı
+    (`ISITMA_TIPI_ORANLARI_IL`) + İstanbul'da apartman için ilçe bazlı
+    (`ISITMA_TIPI_ORANLARI_ISTANBUL_ILCE`) tablolardan atar.
+
+    RNG korunumu (Ek A.6): tek büyük `rng.choice` çağrısı yerine birden fazla küçük çağrı
+    yapılıyor, ama bu çağrıların `size` toplamı bu ilin toplam hane sayısına (n_il) eşit
+    kalıyor — `Generator.choice(p=...)` her zaman `size` kadar ham çekiliş tüketir,
+    kaç ayrı çağrıya bölündüğünden bağımsız. Bu yüzden `base_multiplier`/`has_ac` bit-bit
+    korunmalı; regenerasyon sonrası eski parquet'le satır satır karşılaştırılarak
+    doğrulandı (bkz. docs/PROGRESS.md)."""
     isitma = np.empty(len(konut_tipi), dtype=object)
-    for (konut, kk), oranlar in ISITMA_TIPI_ORANLARI.items():
-        mask = (konut_tipi == konut) & (kent_kir == kk)
+
+    def _cek(mask, oranlar):
         n = int(mask.sum())
         if n == 0:
+            return
+        # Savunmacı normalizasyon: config'teki 6 ondalıklı yuvarlama np.random.Generator.choice'un
+        # kendi toleransını (rtol=1e-8 mertebesi) aşabiliyor — "probabilities do not sum to 1"
+        # ile patlıyordu. Oranların KENDİSİ değişmiyor, yalnız temsil hassasiyeti düzeltiliyor.
+        anahtarlar = list(oranlar.keys())
+        p = np.array(list(oranlar.values()), dtype=np.float64)
+        p = p / p.sum()
+        isitma[mask] = rng.choice(anahtarlar, size=n, p=p)
+
+    if il_kodu == 34:
+        apartman_mask = konut_tipi == 'apartman'
+        for (ilce, kk), oranlar in ISITMA_TIPI_ORANLARI_ISTANBUL_ILCE.items():
+            _cek(apartman_mask & (ilce_kayit_no == ilce) & (kent_kir == kk), oranlar)
+
+    for (il, konut, kk), oranlar in ISITMA_TIPI_ORANLARI_IL.items():
+        if il != il_kodu:
             continue
-        isitma[mask] = rng.choice(list(oranlar.keys()), size=n, p=list(oranlar.values()))
+        _cek((konut_tipi == konut) & (kent_kir == kk), oranlar)
+
+    assert not (isitma == None).any(), (  # noqa: E711 (object array, np.any(None) karşılaştırması gerekli)
+        f"il={il_kodu}: bazı haneler hiçbir (il/ilçe, konut, kent_kir) tablosuyla eşleşmedi"
+    )
     return isitma
 
 
@@ -114,6 +153,23 @@ def ata_has_ac(rng, kent_kir: np.ndarray, household_size: np.ndarray) -> np.ndar
     ekstra = np.clip(household_size.astype(np.float64) - 2, 0, None) * 0.03
     oran = np.clip(taban + ekstra, 0.0, 0.95)
     return rng.random(len(kent_kir)) < oran
+
+
+def ata_fuel_type(rng, kent_kir: np.ndarray, isitma_tipi: np.ndarray) -> np.ndarray:
+    """Adım 2b Karar 5 (2026-08-21): yalnız `isitma_tipi=='soba'` haneler için kömür/odun
+    ataması, `config/solid_fuel.py::FUEL_TYPE_KOMUR_ORANI`'ndan. Diğer ısıtma tiplerinde
+    `None` (gaz/elektrik yakıt tipi taşımaz). Karar 4'ün RNG sırasında EN SONA eklendi
+    (has_ac'tan sonra) — böylece bu yeni adım, ondan önceki hiçbir çekilişin (dolayısıyla
+    base_multiplier/has_ac'ın) konumunu değiştirmez."""
+    fuel = np.full(len(kent_kir), None, dtype=object)
+    soba_mask = isitma_tipi == 'soba'
+    for kk, komur_orani in FUEL_TYPE_KOMUR_ORANI.items():
+        mask = soba_mask & (kent_kir == kk)
+        n = int(mask.sum())
+        if n == 0:
+            continue
+        fuel[mask] = rng.choice(['komur', 'odun'], size=n, p=[komur_orani, 1 - komur_orani])
+    return fuel
 
 
 if __name__ == "__main__":
@@ -164,9 +220,10 @@ if __name__ == "__main__":
 
         tip_idx, size = orneklen_tip_buyukluk(rng, p_by_il[il_kodu], n_il, yedi_plus_degerler, yedi_plus_agirlik)
         kent_kir_il = np.repeat(grup['kent_kir'].to_numpy(), grup['hane_sayisi'].to_numpy())
+        ilce_kayit_no_il = np.repeat(grup['ilce_kayit_no'].to_numpy(), grup['hane_sayisi'].to_numpy())
 
         konut = ata_konut_tipi(rng, kent_kir_il)
-        isitma = ata_isitma_tipi(rng, konut, kent_kir_il)
+        isitma = ata_isitma_tipi(rng, il_kodu, ilce_kayit_no_il, konut, kent_kir_il)
         carpan = ata_base_multiplier(rng, n_il)
         carpan = carpan / carpan.mean()  # il içi ortalama tam 1.0
         has_ac = ata_has_ac(rng, kent_kir_il, size)

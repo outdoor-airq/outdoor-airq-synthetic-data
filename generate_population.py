@@ -21,7 +21,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from config.dtypes import (
-    DAGITIM_SIRKETI_DTYPE, HOUSEHOLD_TYPE_DTYPE, ISITMA_TIPI_DTYPE,
+    DAGITIM_SIRKETI_DTYPE, FUEL_TYPE_DTYPE, HOUSEHOLD_TYPE_DTYPE, ISITMA_TIPI_DTYPE,
     KENT_KIR_DTYPE, KONUT_TIPI_DTYPE, YERLESIM_TIPI_DTYPE,
 )
 from config.distribution_regions import dagitim_sirketi
@@ -29,7 +29,7 @@ from config.provinces import IL_SIRASI
 from config.seed import rng_for_il
 from src.allocate_households import allocate_households
 from src.assign_attributes import (
-    ata_base_multiplier, ata_has_ac, ata_isitma_tipi, ata_konut_tipi,
+    ata_base_multiplier, ata_fuel_type, ata_has_ac, ata_isitma_tipi, ata_konut_tipi,
     coz_lambda_ve_p, il_tip_payi, orneklen_tip_buyukluk, yedi_plus_agirliklari,
 )
 from src.build_settlements import build_settlements
@@ -80,6 +80,7 @@ def _pyarrow_schema_uret(ad_dtypes: dict) -> pa.Schema:
         pa.field('has_ac', pa.bool_()),
         pa.field('base_multiplier', pa.float32()),
         pa.field('household_profile', pa.string()),
+        kategori_alani('fuel_type', FUEL_TYPE_DTYPE),
     ])
 
 
@@ -104,10 +105,11 @@ def _il_dataframe_uret(il_kodu, grup, rng, p, yedi_plus_degerler, yedi_plus_agir
     kent_kir_il = np.repeat(grup['kent_kir'].to_numpy(), grup['hane_sayisi'].to_numpy())
 
     konut = ata_konut_tipi(rng, kent_kir_il)
-    isitma = ata_isitma_tipi(rng, konut, kent_kir_il)
+    isitma = ata_isitma_tipi(rng, il_kodu, ilce_kayit_no, konut, kent_kir_il)
     carpan = ata_base_multiplier(rng, n_il)
     carpan = carpan / carpan.mean()
     has_ac = ata_has_ac(rng, kent_kir_il, size)
+    fuel_type = ata_fuel_type(rng, kent_kir_il, isitma)
     dagitim = np.array([dagitim_sirketi(il_kodu, int(ic)) for ic in ilce_kayit_no])
 
     household_type = np.array(HOUSEHOLD_TYPES_ORDERED, dtype=object)[tip_idx]
@@ -138,6 +140,7 @@ def _il_dataframe_uret(il_kodu, grup, rng, p, yedi_plus_degerler, yedi_plus_agir
         'has_ac': has_ac.astype(bool),
         'base_multiplier': carpan.astype(np.float32),
         'household_profile': household_profile,
+        'fuel_type': pd.Categorical(fuel_type, dtype=FUEL_TYPE_DTYPE),
     })
     return df, n_il
 
