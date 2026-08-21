@@ -255,53 +255,67 @@ değişir ve `households_marmara` yeniden yüklenir.
 
 Düzeltme yapılırsa Ek A.1, A.2 ve A.7'deki tüm sayılar yeniden ölçülür ve güncellenir.
 
-#### Karar 4 — veri çıkarımı sonucu (2026-08-20): kapsam genişliyor, sonuçsuz DEĞİL
+#### Karar 4 — veri çıkarımı sonucu (2026-08-20, 2026-08-21'de düzeltildi): İstanbul için ölçülmüş hedef, SAYIM tabanlı
 
 Üç kapı (§0.1'in devamı, Kapı 1-3) tamamlandı. `abone_mesken(il)` (abone SAYISI, il bazlı,
 mesken-özel) hiçbir metin-tabanlı kaynakta bulunamadı — GAZBİR'in yıllık Dağıtım Sektörü
 Raporu yalnız taranmış flip-book olarak var, OCR/elle transkribe **yapılmadı** (kullanıcı
-kararıyla kapatıldı). Ama madde 3'teki "sonuçsuz" dalı **devreye girmedi** — bunun yerine
-il bazlı **mesken tüketimi** (abone sayısı değil, tüketim) ölçülebildi ve bu, Karar 4'ün
-asıl sorusuna (kombi hane sayısı doğru mu?) daha güçlü bir kanıt yolu açtı:
+kararıyla kapatıldı).
+
+**İlk deneme (2026-08-20) tüketim oranı üzerinden bir "düzeltme çarpanı" (~2) üretti, ama bu
+yaklaşım terk edildi** — kapsama testinde (madde 19'un o zamanki, hatalı hali) tutarsız çıktı
+verdi ve daha yakından bakılınca İGDAŞ'ın `kullanım_sınıfı` alanının cihaz kombinasyonu
+tarif ettiği, bina topolojisi değil, ortaya çıktı: "MERKEZİ ISINMA+OCAK" gibi sınıflar aslında
+merkezi ısıtmalı binadaki bir DAİRENİN yalnız ocak sayacı, bina kazanı değil. Bu yüzden
+**tüketim** üzerinden kurulan `merkezi_pay`/`daire_per_bina` hesapları payda tarafında yanlış
+sınıfları karıştırıyordu.
+
+**Doğru yöntem — sayım (tüketim değil):**
+
+İGDAŞ'ın kullanıcı_sayısı kolonu, sınıf bazında ayrıştırılınca iki temiz grup veriyor:
+
+| Grup | Sınıflar | Sayaç | Ort. m³/yıl/sayaç |
+|---|---|---|---|
+| Gerçek bina kazanı | `MERKEZİ ISINMA`, `+BOYLER` | 24.730 | 38.320 (bina kazanı bandında) |
+| Kombi dairesi | `MERKEZ` içermeyen tüm sınıflar | 4.828.855 | 869,4 (daire bandında) |
+
+Sayım oranı olduğu için boş konut/pasif sayaç sorunundan bağışık — pay ve paydada aynı
+şekilde var, sadeleşiyor:
 
 ```
-mesken_tuketim(il) = Tablo_8.3_toplam(il, 2025) × mesken_pay(il, 2022)
+İGDAŞ (gerçek, sayım)          Model (İstanbul, mevcut)
+kombi konut birimi   4.436.039  %89,5     2.643.287  %63,2
+merkezi konut birimi   519.786  %10,5     1.541.693  %36,8
 ```
 
-`mesken_pay(il)` EPDK'nın 2022 raporundaki (gerçek metin, DOCX) il×sektör tablolarından
-**oran** olarak alındı, mutlak seviye 2025'ten geliyor — İstanbul için 2022 oranı (%60,81)
-ile 2025'in bağımsız ölçümü (İGDAŞ/EPDK çapraz kontrolü, %61,84) neredeyse aynı çıktı (1,03
-puan fark), oranın yıl-üstü kararlılığını destekliyor.
+("Kombi konut birimi" burada `MERKEZ` içermeyen İGDAŞ sınıflarının sayaç toplamı — %10,5'i
+kapsamayan kısım "daire-sayacı-gibi merkezi" sınıflarını (519.786) DIŞARIDA tutar; onlar
+merkezi grubunda kalır.)
 
-**Yeni ölçüm — iki bölme:**
+**Karar 4'ün İstanbul hedefi artık ölçülmüş, tahmin değil: merkezi payı model'de ~3 kat fazla
+atanmış (%36,8 → gerçek %10,5), kombi payı ~%67 eksik atanmış (%63,2 → gerçek %89,5).**
+Ayrıca 5.485.643 konut abonesi ≈ İstanbul'un toplam hane sayısının tamamı (4.917.759) —
+İstanbul fiilen tam gazlı; modeldeki `# VARSAYIM` soba (%3,9) + elektrikli (%11, ~730 bin
+hane) payı gerçekçi değil.
 
-```
-ima_edilen_hane_basi = Σ mesken_tuketim(11 il) / Σ kombi_hane(11 il)
-duzeltme_carpani     = ima_edilen_hane_basi / GAZBİR_yillik_hane_basi(942,8 m3)
-```
+**İstanbul için `ISITMA_TIPI_ORANLARI` düzeltmesi bütün dağılımı (kombi+merkezi+soba+elektrikli)
+hedefleyecek**, yalnız merkezi payını değil — Karar 4 madde 4'ün "yalnız merkezi payı"
+kısıtlaması kanıtsız alınmıştı, artık kanıt var. **Diğer 10 il için İGDAŞ muadili veri yok**
+— Test 1'in kapsama oranları (§ aşağıda, madde 19/20'nin geliştirilme süreci) tek elimizdeki
+sinyal ve seviyeyi ölçüyor, oranı değil; o illerde madde 4'ün orijinal kuralı (yalnız merkezi
+payı, ihtiyatlı) geçerli kalıyor.
 
-| | ima_edilen_hane_başı | düzeltme_çarpanı |
-|---|---|---|
-| Marmara (11 il) | 1.857,6 m³/hane/yıl | **1,970** |
-| İstanbul tek başına (İGDAŞ gerçek ölçüm) | 1.975,3 m³/hane/yıl | **2,095** |
+**Yan ölçümler, aynı sayımdan çıktı, ikisi de `# VARSAYIM` olmaktan çıktı:**
 
-Çarpan **1'e yakın değil, ~2**. Madde 3'ün `> 1` dalı devrede: kombi havuzu gerçekten düşük.
-Bağımsız bir işaret aynı yöne işaret ediyor: görsel okunan (düşük güven, tek kaynak) İstanbul
-konut abone sayısı **5.485.643** — modelin İstanbul **toplam hane sayısından** (4.917.759,
-kombi+merkezi+soba+elektrikli hepsi dahil) bile yüksek. Yani (a) sayaç ≈ konut birimi, hane
-değil (boş konutlar dahil olabilir), (b) İstanbul'da doğalgaz erişimi modelin varsaydığından
-çok daha yaygın.
+- **`daire_per_bina` (sayım tabanlı) = 21,0** (519.786 daire-sayacı ÷ 24.730 bina kazanı).
+  Yönergenin eski `[20,40]` varsayılan bandının alt ucunda — makul.
+- **`ρ` (merkezi/kombi tüketim oranı) = 2,1`** (merkezi daire başı ima edilen tüketim, bina
+  kazanının toplam tüketimi daire_per_bina'ya bölünerek: 38.320/21,0 ≈ 1.823 m³/yıl, ÷ kombi
+  dairesi 869,4 m³/yıl). Ortak alan ısıtması + kısmi ısıtma yapılamaması ile tutarlı bir
+  büyüklük.
 
-**Karar 4 madde 4'ün İstanbul için düzeltmesi — yalnız merkezi payı DEĞİL, tüm dağılım:**
-Madde 4 "yalnız merkezi payı hedeflenir, soba/elektrikliye dokunulmaz" diyordu — o karar
-kanıtsız alındı, artık kanıt var: İstanbul'da `# VARSAYIM` olan soba (%3,9) ve elektrikli
-(%11, toplam ~730 bin hane) payı, doğalgazın bu denli yaygın olduğu bir ilde gerçekçi
-görünmüyor. **İstanbul için `ISITMA_TIPI_ORANLARI` düzeltmesi bütün dağılımı (kombi + merkezi
-+ soba + elektrikli) hedefleyecek**, yalnız merkezi payını değil. **Diğer 10 il için kanıt
-yok** — madde 4'ün orijinal kuralı (yalnız merkezi payı) onlarda geçerli kalıyor.
-
-Bu ölçümün kendisi henüz `households.parquet`'e uygulanmadı — bir sonraki blokta (popülasyon
-düzeltmesi) İstanbul'a özel hedef dağılım belirlenip uygulanacak.
+Bu ölçümlerin hiçbiri henüz `households.parquet`'e uygulanmadı — popülasyon düzeltmesi ayrı
+onay bekliyor.
 
 ### Karar 5 — Katı yakıt (soba) kapsam içinde mi? — **KAPANDI: EVET, kalibrasyon katmanında. AQI korelasyonu HAYIR, ayrı adım.**
 
@@ -384,7 +398,7 @@ src/
   heating_shape.py              # SAF FONKSİYON: h(theta), HDD, theta_ref — dış bağımlılık yok
   build_gas_calibration.py
   build_solid_fuel_calibration.py
-  validate_heating_calibration.py   # 18 madde, iki çıktıyı birlikte denetler
+  validate_heating_calibration.py   # 20 madde, iki çıktıyı birlikte denetler
 data/
   bdew/bdew_gas_sigmoid_coefficients.csv  # demandlib'den dışa aktarılmış, versiyonlu
   epdk/il_yillik_tuketim_YYYY.csv   # elle çıkarılmış, versiyonlu
@@ -623,21 +637,29 @@ Koruma bantları: `> 1` → kombi havuzu düşük ya da abone rakamı mesken dı
 kullanıcı sayısı** veriyor; merkezi sınıfının kullanıcı sayısı doğrudan bina sayısıdır →
 `daire_per_bina` popülasyonun %57,7'si için **ölçülür**.
 
-#### 4.4.1 Aynı mesele seviye katmanına da sızıyor — %26'lık soru
+#### 4.4.1 Aynı mesele seviye katmanına da sızıyor — KAPANDI (2026-08-21)
 
-GAZBİR'in "hane başına aylık 154,6 m³" rakamının paydası **abone** ise, içinde %1 kadar bina
-sayacı var ve her biri bir dairenin ~30 katını tüketiyor:
+**Sonuç: GAZBİR'in yıllık hane-başı rakamı (942,8 m³, `data/gazbir/marmara_aylik_hane_m3.csv`)
+ABONE başınadır, hane başına değil.** GAZBİR'in raporlarında bunu söyleyen bir metodoloji
+notu yok (aranıp bulunamadı) — kapanış dolaylı ama sağlam bir kanıtla geldi: **madde 20'nin
+abone testi.** Zincir `mesken_tuketim(il)/942,8` üzerinden İstanbul için 5.446.029 abone
+ima ediyor; İGDAŞ'ın kendi ölçtüğü İstanbul konut abone sayısı 5.485.643 — **sapma yalnızca
+%0,76.** 942,8 hane başına olsaydı bu denli yakın bir eşleşme (İGDAŞ'ın bağımsız abone
+sayımıyla) tesadüf olurdu; abone başına olduğu için beklenen sonuç budur.
 
-```
-abone başına ortalama = kombi dairesinin 1,26 – 1,36 katı
-=> gerçek kombi dairesi 114 – 122 m³   (154,6 değil)
-```
+Eski plan (`1,26` düzeltmesi, aralık tahmini) **iptal** — yerine ölçülmüş, `level_source =
+igdas_ilce` etiketli iki değer kullanılacak:
 
-154,6'yı doğrudan her kombi hanesine yazarsak **~%26 fazla üretiriz.**
+- **Kombi dairesi gerçek ortalaması: 869,4 m³/yıl** (İGDAŞ'ın "MERKEZİ" içermeyen mesken
+  sınıflarının toplam tüketimi ÷ toplam sayacı, doğrudan ölçüm).
+- **Karışım düzeltmesi: 1,084** (= 942,8 / 869,4) — GAZBİR'in Marmara-geneli, kombi+merkezi
+  karışık abone ortalamasının, saf kombi ortalamasından ne kadar yüksek çıktığını verir.
+  Eski tahmin (1,26) aralığın üst ucuna yakındı ama gerçek değer daha düşük çıktı — kombi
+  havuzunun payı düşünüldüğünde beklenen yönde (bkz. Karar 4 alt bölümü, kombi %89,5).
 
-**Yapılacak:** GAZBİR raporunun metodoloji notundan paydanın "konut abonesi" mi "hane" mi
-olduğu okunacak. Belirsizse abone kabul edilip düzeltme uygulanacak ve `# VARSAYIM`
-etiketlenecek — %26'lık bir belirsizliği sessiz bırakmak seçenek değil.
+Sonuç aşağı akışa taşınıyor: `config/gas.py`'da `SM3_TO_KWH` gibi ölçülmüş sabitlerin yanına
+`KOMBI_DAIRE_YILLIK_M3 = 869.4` ve `KARISIM_DUZELTME_ORANI = 1.084` eklenecek (bu turda
+henüz kod değişikliği yapılmadı, yalnız yönerge).
 
 ### 4.5 Katı yakıt katmanı (Karar 5)
 
@@ -747,6 +769,8 @@ döner, her madde `OK` / `FARKLI` etiketiyle ayrı yazdırılır.
 | 16 | `Σ kombi_hane` = **4.401.560**, `Σ soba_hane` = **660.949** — `households.parquet` ile tam eşitlik, tolerans yok |
 | 17 | Üç provenance kolonu hiçbir satırda NULL/boş değil; hangi satırın hangi kaynaktan geldiği sayılarla yazdırılıyor |
 | 18 | `households.parquet` değişmedi (dosya hash'i koşu öncesi/sonrası aynı); çıktı dosyaları < 5 MB — **bu adımda hane bazlı veri üretilmediğinin güvencesi** |
+| 19 | **Bölüntü testi (Karar 4 popülasyon düzeltmesi için, 2026-08-20 eklendi, 2026-08-21 iki kez düzeltildi — önce birim hatası, sonra totoloji):** `kombi_hane(il) + merkezi_hane(il) + soba_hane(il) + elektrikli_hane(il) == toplam_hane(il)` (tam eşitlik, tolerans yok) ve her kategori `≥ 0`. **Önceki hal (`kombi+merkezi ≤ toplam`) totolojikti** — `isitma_tipi` zaten hanelerin bir bölüntüsü olduğu için mevcut popülasyonla asla başarısız olamazdı, hiçbir şey yakalamıyordu. Bu hal Karar 4 düzeltmesinin en olası uygulama hatasını yakalar: bir kategoriyi (örn. kombiyi) çarpanla büyütüp diğerlerini aynı oranda küçültmeyi unutmak — toplam hane sayısı sessizce 8.529.528 olmaktan çıkar. Düzeltme bir yeniden dağıtım olmak ZORUNDADIR, yalnız bir kategoriye ekleme değil |
+| 20 | **Abone testi (2026-08-21 eklendi):** `Σ_il [mesken_tuketim(il) / 942,8] ≈ Σ_il konut_abone(il)`. Bu, seviye zincirinin (EPDK il tüketimi × 2022 mesken payı ÷ GAZBİR hane-başı) bağımsız ölçülmüş abone sayısına ne kadar yakın düştüğünü sınar. İstanbul için: ölçülen 5.485.643 (İGDAŞ, görsel okuma, düşük güven), zincirin ima ettiği 5.446.029 — **sapma %0,76**, eşik ±%5. **GEÇTİ.** Sapma ±%5'i aşarsa girdi zincirinden biri (EPDK 2022 oranı, 2025 seviyesi, ya da 942,8'in kendisi) bozuktur |
 
 Madde 3 ve 5 bu adımın en kritik iki kontrolüdür: ikisi de sessizce yanlış olabilecek,
 aşağı akışta hiçbir toplamı bozmayan hatalar yakalar. Geçmiyorsa kod ilerletilmez.
