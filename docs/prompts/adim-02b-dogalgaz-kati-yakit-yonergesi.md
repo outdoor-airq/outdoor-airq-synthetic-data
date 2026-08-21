@@ -255,6 +255,54 @@ değişir ve `households_marmara` yeniden yüklenir.
 
 Düzeltme yapılırsa Ek A.1, A.2 ve A.7'deki tüm sayılar yeniden ölçülür ve güncellenir.
 
+#### Karar 4 — veri çıkarımı sonucu (2026-08-20): kapsam genişliyor, sonuçsuz DEĞİL
+
+Üç kapı (§0.1'in devamı, Kapı 1-3) tamamlandı. `abone_mesken(il)` (abone SAYISI, il bazlı,
+mesken-özel) hiçbir metin-tabanlı kaynakta bulunamadı — GAZBİR'in yıllık Dağıtım Sektörü
+Raporu yalnız taranmış flip-book olarak var, OCR/elle transkribe **yapılmadı** (kullanıcı
+kararıyla kapatıldı). Ama madde 3'teki "sonuçsuz" dalı **devreye girmedi** — bunun yerine
+il bazlı **mesken tüketimi** (abone sayısı değil, tüketim) ölçülebildi ve bu, Karar 4'ün
+asıl sorusuna (kombi hane sayısı doğru mu?) daha güçlü bir kanıt yolu açtı:
+
+```
+mesken_tuketim(il) = Tablo_8.3_toplam(il, 2025) × mesken_pay(il, 2022)
+```
+
+`mesken_pay(il)` EPDK'nın 2022 raporundaki (gerçek metin, DOCX) il×sektör tablolarından
+**oran** olarak alındı, mutlak seviye 2025'ten geliyor — İstanbul için 2022 oranı (%60,81)
+ile 2025'in bağımsız ölçümü (İGDAŞ/EPDK çapraz kontrolü, %61,84) neredeyse aynı çıktı (1,03
+puan fark), oranın yıl-üstü kararlılığını destekliyor.
+
+**Yeni ölçüm — iki bölme:**
+
+```
+ima_edilen_hane_basi = Σ mesken_tuketim(11 il) / Σ kombi_hane(11 il)
+duzeltme_carpani     = ima_edilen_hane_basi / GAZBİR_yillik_hane_basi(942,8 m3)
+```
+
+| | ima_edilen_hane_başı | düzeltme_çarpanı |
+|---|---|---|
+| Marmara (11 il) | 1.857,6 m³/hane/yıl | **1,970** |
+| İstanbul tek başına (İGDAŞ gerçek ölçüm) | 1.975,3 m³/hane/yıl | **2,095** |
+
+Çarpan **1'e yakın değil, ~2**. Madde 3'ün `> 1` dalı devrede: kombi havuzu gerçekten düşük.
+Bağımsız bir işaret aynı yöne işaret ediyor: görsel okunan (düşük güven, tek kaynak) İstanbul
+konut abone sayısı **5.485.643** — modelin İstanbul **toplam hane sayısından** (4.917.759,
+kombi+merkezi+soba+elektrikli hepsi dahil) bile yüksek. Yani (a) sayaç ≈ konut birimi, hane
+değil (boş konutlar dahil olabilir), (b) İstanbul'da doğalgaz erişimi modelin varsaydığından
+çok daha yaygın.
+
+**Karar 4 madde 4'ün İstanbul için düzeltmesi — yalnız merkezi payı DEĞİL, tüm dağılım:**
+Madde 4 "yalnız merkezi payı hedeflenir, soba/elektrikliye dokunulmaz" diyordu — o karar
+kanıtsız alındı, artık kanıt var: İstanbul'da `# VARSAYIM` olan soba (%3,9) ve elektrikli
+(%11, toplam ~730 bin hane) payı, doğalgazın bu denli yaygın olduğu bir ilde gerçekçi
+görünmüyor. **İstanbul için `ISITMA_TIPI_ORANLARI` düzeltmesi bütün dağılımı (kombi + merkezi
++ soba + elektrikli) hedefleyecek**, yalnız merkezi payını değil. **Diğer 10 il için kanıt
+yok** — madde 4'ün orijinal kuralı (yalnız merkezi payı) onlarda geçerli kalıyor.
+
+Bu ölçümün kendisi henüz `households.parquet`'e uygulanmadı — bir sonraki blokta (popülasyon
+düzeltmesi) İstanbul'a özel hedef dağılım belirlenip uygulanacak.
+
 ### Karar 5 — Katı yakıt (soba) kapsam içinde mi? — **KAPANDI: EVET, kalibrasyon katmanında. AQI korelasyonu HAYIR, ayrı adım.**
 
 Makine aynı: aynı sıcaklık katmanı, aynı IPF, aynı çıktı deseni. Marjinal maliyeti düşük.
@@ -487,11 +535,16 @@ iller arası pay). `wind_class=1`'e sınıra bu kadar yakın çıkması bu ara �
 olduğunu gösterir, üzerinde daha fazla oynamak (ör. bölgesel EFH/MFH karışımına geçmek)
 kendi tahminlerimize fit etmek olurdu — reddedildi.
 
-**Bilinen sapma (kayıtlı, gizlenmedi):** `wind_class=1`'in Ocak/Ağustos oranı (7,996) ve
-yıllık toplamı (953,0) hedef bandın sınırında — sırasıyla 0,004 eksik ve 3 m³ fazla. İki
-ıskalama aynı yöne işaret ediyor (model mevsimselliği çıpalardan marjinal olarak daha düz)
-ve muhtemelen aynı kök nedenin iki görünümü, büyüklük %0,05–%0,3. `docs/PROGRESS.md`'ye
-ayrıca işlendi.
+**Bilinen sapma — Kapı 3'ün gerçek verisiyle büyüklüğü netleşti (2026-08-20):** spike sırasında
+"marjinal" (%0,05–%0,3) denen sapma, gerçek GAZBİR aylık serisiyle (`data/gazbir/marmara_aylik_hane_m3.csv`)
+karşılaştırılınca **belirgin şekilde büyük** çıktı: gerçek Ocak/Ağustos oranı **12,47**, model
+**7,996** — model mevsimselliği gerçekten **%36 daha düz**. Yıllık toplam ise hâlâ yakın (953,0
+model / 942,8 gerçek, ~%1 fark). **Kabul ediliyor, çözülmüyor:** §4.3'ün IPF'i sütun marjinalini
+(aylık toplam) GAZBİR'e birebir kilitlediği için modelin mevsimselliği gerçek veriyle üzerine
+yazılacak — h(θ) yalnızca (a) ay içinde günlerin dağılımına ve (b) iller arası paya etki ediyor.
+(b)'de kalan artık sapma (soğuk illerin modelin düzleştirdiği şekil yüzünden hafif eksik pay
+alması) **ikincil ve `# VARSAYIM`** olarak kayıtlı — düzeltilmeyecek, yalnız işaretlenecek.
+`docs/PROGRESS.md`'ye ayrıca işlendi.
 
 **Denenip reddedilen alternatif — SigLinDe'nin doğrusal su-ısıtma terimi:** eski PDF
 formülünün terimini geri eklemek denendi; işareti düzeltilmiş haliyle bile Ocak/Ağustos
@@ -679,7 +732,7 @@ döner, her madde `OK` / `FARKLI` etiketiyle ayrı yazdırılır.
 | 1 | `data/bdew/bdew_gas_sigmoid_coefficients.csv` başlığındaki kaynak paket/sürüm/tarih/formül/`wind_class` açıklaması dolu; katsayı sayısı beklenen |
 | 2 | `GAZ_DAGITIM_MAP` 11 ili tam kapsıyor, boşluk/çakışma yok. `'DOĞRULANACAK'` değeri **yalnızca** `config/gas.py`'daki `DAGITIM_MAP_BEKLEYEN`'de adı geçen iller için kabul edilir (2026-08-20 itibarıyla tam olarak `{77: 'Yalova'}`); listede olmayan bir ilde `'DOĞRULANACAK'` görülürse HATA. Ayrıca `len(DAGITIM_MAP_BEKLEYEN) <= 1` — liste büyürse HATA (bilinen eksik adı-konmuş bir istisna olarak kalmalı, "15/16 de olur" diye normalleşip gerçek bir kırılmayı gizlememeli) |
 | 3 | **İŞARET TESTİ:** her profil için `h(6) / h(26) > 1`; değer bantla birlikte yazdırılıyor (§4.2.1) |
-| 4 | **Türkiye kalibrasyonu (yumuşak bant — Faz 2 spike'ı Ocak/Ağustos=7,996 ve yıllık=953,0 ile sınırda geçti, §4.2.2):** Ocak/Ağustos ∈ [8,10]; ısıtma-dışı pay ∈ [%20,%28]; yıllık m³/hane ∈ [750,950]. Üçü birden. **Not: bu bant §4.3'ün IPF'i tarafından üzerine yazılır** — IPF yakınsadıktan sonra nihai Ocak/Ağustos oranı GAZBİR'in gerçek oranıdır, bu madde yalnızca h(θ)'nın makul bir ara ürün olduğunu doğrular, kesin kabul kriteri değildir |
+| 4 | **Türkiye kalibrasyonu — bant gerçek GAZBİR serisinden türetildi, proxy'den değil (2026-08-20, `data/gazbir/marmara_aylik_hane_m3.csv`):** gerçek Ocak/Ağustos oranı **12,47** (154,6/12,4), gerçek yıllık (12 ayın toplamı) **942,8 m³/hane**. Model (Faz 2 spike) Ocak/Ağustos=7,996, yıllık=953,0 vermişti — yıllık neredeyse birebir tutuyor (%1 fark), Ocak/Ağustos ise **%36 daha düz** (**bilinen, kabul edilmiş sapma** — §4.2.2 ve aşağıya bkz.). Bant bu nedenle iki parçalı: **yıllık m³/hane ∈ [850,1050]** (sıkı, gerçek değere yakın); **Ocak/Ağustos ∈ [6,14]** (geniş, modelin bilinen düzlüğünü kapsayacak şekilde — madde 12'nin il-bazlı bandıyla aynı). Isıtma-dışı pay ∈ [%20,%28] (TÜİK kaynaklı, GAZBİR aylık serisinde karşılığı yok, değişmedi). **Not: bu bant §4.3'ün IPF'i tarafından üzerine yazılır** — IPF yakınsadıktan sonra nihai Ocak/Ağustos oranı GAZBİR'in gerçek oranıdır (12,47), bu madde yalnızca h(θ)'nın makul bir ara ürün olduğunu doğrular, kesin kabul kriteri değildir |
 | 5 | **Isınma payı:** pencere ilk 3 gününün `theta_ref`'i, 3 gün öncesi çekilmeden hesaplananla **farklı** (yani ısınma gerçekten uygulanmış) |
 | 6 | `theta_ref` fiziksel bantta (-15 … +40 °C); NaN/inf yok |
 | 7 | Zaman ekseninde boşluk yok: her il için beklenen gün sayısı kadar satır; eksik günler listeleniyor |
@@ -687,7 +740,7 @@ döner, her madde `OK` / `FARKLI` etiketiyle ayrı yazdırılır.
 | 9 | `gun_agirligi` her (il, ay) için toplamı **1,0 ± 1e-9** |
 | 10 | **IPF marjinal 1:** her il için yıllık toplam, EPDK il tüketimine **±%0,1** |
 | 11 | **IPF marjinal 2:** her ay için Marmara toplamı, GAZBİR aylığına **±%0,1** |
-| 12 | Gaz: Mevsimsel asimetri (Ocak toplamı / Ağustos toplamı) her il için ∈ [6, 14]. **Katı yakıt: bu oran tanımsız (payda 0), yerine** Haziran–Ağustos toplamı tam 0; Aralık–Şubat toplamı yıllık toplamın %55–%75'i (Karar 5) |
+| 12 | Gaz: Mevsimsel asimetri (Ocak toplamı / Ağustos toplamı) her il için ∈ [6, 14] — bant artık gerçek Marmara-geneli GAZBİR ölçümünü (12,47, madde 4) rahatça kapsıyor, proxy'den türetilmiş eski bandın (BOTAŞ KFU) tesadüfen doğru mertebede olduğu teyit edildi. **Katı yakıt: bu oran tanımsız (payda 0), yerine** Haziran–Ağustos toplamı tam 0; Aralık–Şubat toplamı yıllık toplamın %55–%75'i (Karar 5) |
 | 13 | `gunluk_hane_m3 > 0`, NaN/inf yok; makullük bandı 0,3 – 12 m³/gün (hane başı, `# VARSAYIM`) |
 | 14 | **Ölçek çapraz kontrolü:** Ocak `gunluk_hane_kwh × 31`, aynı ayın elektrik `ortalama_hane_kwh` toplamının 5–10 katı (§4.6) |
 | 15 | **Abone tutarlılığı:** §4.4 ile çözülen `penetrasyon(il)` ∈ [0,7 , 1,0]; bant dışı iller tek tek listeleniyor |
