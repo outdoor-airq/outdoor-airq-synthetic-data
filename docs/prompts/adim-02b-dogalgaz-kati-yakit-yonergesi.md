@@ -599,27 +599,64 @@ formülünün terimini geri eklemek denendi; işareti düzeltilmiş haliyle bile
 oranını 4,4–5,4'e düşürüyor — saf sigmoidin 8,0–9,7'sinden daha kötü. SigLinDe yalnızca
 erişilemez değil, Türkiye verisi için de daha kötü bir uyum; peşine düşülmeyecek.
 
-### 4.3 Seviye katmanı — IPF ile çift marjinal
+### 4.3 Seviye katmanı — IPF ile çift marjinal — **marjinaller düzeltildi (2026-08-21)**
 
 Sorun: GAZBİR **Marmara'yı tek birim** verir (aylık), EPDK **il** verir ama **yıllık**.
 İkisini birden tutturmak bir çift-marjinal problemidir.
 
+**Marjinal 1 — uzamsal (EPDK), yalnız KOMBİ tüketimi:**
+
+```
+kombi_tuketim(il) = Tablo_8.3_toplam(il) × mesken_pay(il) × (1 − merkezi_pay(il))
+```
+
+Karar 1 gereği yalnız kombi haneler gaz yayınlıyor — paydası `kombi_hane` olan bir marjinale
+merkezi bina tüketimini karıştırmak, bu adımda **iki kez** yakaladığımız aynı hatadır (Karar
+4'ün ilk turu ve `daire_per_bina` ölçümü — ikisinde de mesken_tuketim merkezi'yle birlikte
+kullanılınca hane başı değer %27–46 şişmişti, hiçbir toplam bunu yakalamadı). Bu çarpım
+`build_gas_calibration.py`'da tek satırda, yorumlu yazılacak. `Tablo_8.3_toplam(il)` ve
+`mesken_pay(il)` sırasıyla `data/epdk/il_yillik_tuketim_2025.csv` ve
+`data/epdk/il_mesken_pay_2022.csv`'den geliyor (Kapı 2). `merkezi_pay(il)`: İstanbul için
+İGDAŞ'tan ölçülmüş (%19,59, `data/igdas/ilce_kullanim_sinifi_2025.csv`), diğer 10 il bu
+değeri miras alır (`# VARSAYIM` — Karar 4'ün popülasyon düzeltmesiyle aynı kısıt).
+
+**Marjinal 2 — zamansal (GAZBİR), yalnız ŞEKİL, mutlak seviye değil:**
+
+GAZBİR'in 942,8 m³/hane/yıl'ı **abone başına ve karışık bir popülasyonun ortalaması**
+(§4.4.1, KAPANDI) — mutlak seviyesi kombi hanelerine doğrudan uygulanamaz. Ama ay-dan aya
+**şekli** birimden bağımsız ve temiz:
+
+```
+ay_payi(m) = GAZBİR_ay(m) / Σ_ay GAZBİR_ay          → Σ_m ay_payi(m) = 1
+```
+
+`GAZBİR_ay(m)` `data/gazbir/marmara_aylik_hane_m3.csv`'den (12/12 ay, Kapı 3) — mutlak
+değerler değil, birbirine oranları kullanılıyor.
+
 ```
 gün_hedefi(il, d) = hane(il) * KW(il) * h(theta_il, d)
 
-marjinal 1 (uzamsal): Σ_d gün_hedefi(il, d)        = EPDK yıllık il tüketimi
-marjinal 2 (zamansal): Σ_il Σ_{d in ay} gün_hedefi = GAZBİR aylık × toplam hane
+marjinal 1 (uzamsal): Σ_d gün_hedefi(il, d)         = kombi_tuketim(il)                      [mutlak, EPDK]
+marjinal 2 (zamansal): Σ_il Σ_{d in ay} gün_hedefi  = ay_payi(ay) × Σ_il kombi_tuketim(il)    [mutlak, GAZBİR şekli]
 ```
+
+İki marjinal de aynı birimde (m³, kombi-özel) ve ikisi de gerçek veriden — abone/hane
+belirsizliği IPF'e hiç girmiyor, yalnızca ŞEKİL katkısı olarak (ay_payi) süzülüyor.
 
 **Çözüm: IPF/RAS, 3–5 iterasyon.** Satır ölçeği `KW(il)`, sütun ölçeği `s(ay)` dönüşümlü
 güncellenir. Adım 1'de Hare-Niemeyer kullandığımız yerin doğrudan muadili.
 
 Kritik nokta — **iller ayrı ayrı normalize EDİLMEYECEK.** İl bazında aya normalize edilirse
-Bilecik ile İstanbul arasındaki mevsimsel fark silinir. Marmara toplamı GAZBİR'e kilitlenir;
-iller arası fark sıcaklıktan ve `KW(il)`'den gelmeye devam eder.
+Bilecik ile İstanbul arasındaki mevsimsel fark silinir. Marmara toplamı `ay_payi × Σ kombi_tuketim`'e
+kilitlenir; iller arası fark sıcaklıktan ve `KW(il)`'den gelmeye devam eder.
 
 Yakınsama kontrolü: her iterasyonda iki marjinalin göreli hatası; **±%0,1 altına inince dur,
 5 iterasyonda inmezse hata fırlat** (sessizce devam etme).
+
+Modülün geri kalanı — ay içi normalizasyon (`gun_agirligi` toplamı 1, §6 madde 9), yerel gün
+sınırı (Karar 2 tuzak 1, UTC değil Europe/Istanbul), yıl sınırını aşan `theta_ref` ısınma payı
+(3 gün öncesi, §4.1) — zaten yönergede yazılı, `kombi_tuketim`/`ay_payi` düzeltmesi bunları
+değiştirmiyor.
 
 #### 4.3.1 İstanbul ilçe kırılımı — elektrikte olmayan fırsat
 
