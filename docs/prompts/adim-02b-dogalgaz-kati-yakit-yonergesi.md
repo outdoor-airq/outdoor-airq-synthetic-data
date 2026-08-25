@@ -452,8 +452,9 @@ data/
 Mimari, elektriğin iki katmanının gaz karşılığı olarak **dört** katman:
 
 ```
-seviye_uzamsal : EPDK yıllık il tüketimi      -> il başına KW (Kundenwert)
-seviye_zamansal: GAZBİR aylık Marmara m³/hane -> ay ölçeği
+seviye_uzamsal : EPDK yıllık il tüketimi           -> il başına KW (Kundenwert)
+seviye_zamansal: GAZBİR aylık Marmara m³/abone     -> ay ŞEKLİ (§4.4.1 — abone başına, mutlak
+                                                       seviye değil; bkz. Marjinal 2, §4.3)
 şekil_günlük   : BDEW h(theta_il, gün)        -> ay içinde toplamı 1
 şekil_saatlik  : Adım 3b'ye ait, bu adımda YOK (Karar 2)
 ```
@@ -564,16 +565,21 @@ fiziksel olarak doğru seçimdir. Bantlara yakın çıkması bu seçimi **teyit 
 sebebi değil.
 
 Spike sonucu (gerçek 2025 Open-Meteo verisi, kombi hane ağırlıklı Marmara ortalaması, tek
-çıpa GAZBİR Ocak 2025=154,6 m³/hane, Ek A.4):
+çıpa GAZBİR Ocak 2025=154,6 m³ **(abone başına, §4.4.1 — spike zamanında bu ayrım henüz
+kapanmamıştı, çıpa "hane" etiketiyle kullanılmıştı; sonucu maddi olarak değiştirmiyor çünkü
+spike SEVİYE değil ŞEKİL test ediyordu, ama etiket burada düzeltiliyor)**, Ek A.4):
 
-| `wind_class` | Ocak/Ağustos | ısıtma-dışı pay | yıllık m³/hane |
+| `wind_class` | Ocak/Ağustos | ısıtma-dışı pay | yıllık m³ (çıpa birimiyle: abone başına) |
 |---|---|---|---|
 | 0 | 6,706 | %24,5 | 989,8 |
 | **1 (seçilen)** | **7,996** | **%21,7** | **953,0** |
 
 Çıpalar (yumuşak, elle kurulmuş — §6 madde 4'e not): BOTAŞ KFU İstanbul Ocak/Ağustos = 9,75
 → hedef bant **[8, 10]**; TÜİK ısıtma-dışı pay %23,7 → hedef bant **[%20, %28]**; GAZBİR
-Türkiye ort. 978 m³, Marmara ılıman olduğu için altında olmalı → hedef bant **[750, 950]**.
+Türkiye ort. 978 m³ **(abone başına — spike'ın kendi çıpasıyla aynı birim, karşılaştırma
+birim-tutarlı)**, Marmara ılıman olduğu için altında olmalı → hedef bant **[750, 950]**
+(bu bant spike'ın kendi ŞEKİL testi içindir, abone başına; **madde 4'ün nihai [950, 1.200]
+bandıyla KARIŞTIRILMASIN** — o bant kombi hanesi başınadır, §6).
 
 **Parametre ayarı YAPILMAYACAK** — bantlar elle kurulmuş yumuşak ölçütlerdir ve §4.3'teki
 IPF, yakınsadıktan sonra her ayın Marmara toplamını GAZBİR'e birebir eşitleyeceği için nihai
@@ -587,7 +593,8 @@ kendi tahminlerimize fit etmek olurdu — reddedildi.
 "marjinal" (%0,05–%0,3) denen sapma, gerçek GAZBİR aylık serisiyle (`data/gazbir/marmara_aylik_hane_m3.csv`)
 karşılaştırılınca **belirgin şekilde büyük** çıktı: gerçek Ocak/Ağustos oranı **12,47**, model
 **7,996** — model mevsimselliği gerçekten **%36 daha düz**. Yıllık toplam ise hâlâ yakın (953,0
-model / 942,8 gerçek, ~%1 fark). **Kabul ediliyor, çözülmüyor:** §4.3'ün IPF'i sütun marjinalini
+model / 942,8 gerçek — ikisi de **abone başına**, §4.4.1; bu karşılaştırma ŞEKİL testi olduğu
+için birim tutarlı, LEVEL'a taşınmıyor, ~%1 fark). **Kabul ediliyor, çözülmüyor:** §4.3'ün IPF'i sütun marjinalini
 (aylık toplam) GAZBİR'e birebir kilitlediği için modelin mevsimselliği gerçek veriyle üzerine
 yazılacak — h(θ) yalnızca (a) ay içinde günlerin dağılımına ve (b) iller arası paya etki ediyor.
 (b)'de kalan artık sapma (soğuk illerin modelin düzleştirdiği şekil yüzünden hafif eksik pay
@@ -652,6 +659,27 @@ kilitlenir; iller arası fark sıcaklıktan ve `KW(il)`'den gelmeye devam eder.
 
 Yakınsama kontrolü: her iterasyonda iki marjinalin göreli hatası; **±%0,1 altına inince dur,
 5 iterasyonda inmezse hata fırlat** (sessizce devam etme).
+
+**IPF zincirinin dört satırı (2026-08-21 eklendi — kod yazarken doğaçlamaya yer kalmasın):**
+
+```
+tohum(il, ay)      = kombi_hane(il) × Σ_{d∈ay} h(theta_il, d)          # model buraya girer
+IPF                → hücre(il, ay), iki marjinali de tutturur
+gun_agirligi(il,d) = h(theta_il, d) / Σ_{d∈ay} h(theta_il, d)          # Σ = 1, ay içinde
+gunluk_hane_m3     = hücre(il, ay) × gun_agirligi(il,d) / kombi_hane(il)
+```
+
+İki not:
+
+- **Tohumun işlevi:** IPF'in koruyacağı YAPIYI taşır — ilin kendine özgü sıcaklık tepkisi ve
+  EFH/MFH karışımı. Marjinaller yalnız SEVİYEYİ zorlar, ilin şeklini değil — IPF tohumu
+  marjinallere göre ölçeklendirir, tohumun kendi iç yapısını (hangi ay/il diğerlerinden
+  daha çok/az tüketiyor) bozmadan.
+- **Yakınsama kuruluşta garanti:** iki marjinal de aynı toplama eşit — satır marjinali
+  tanımı gereği (`Σ_il kombi_tuketim(il)`), sütun marjinali de `Σ_ay ay_payi(ay) = 1`
+  olduğu için aynı toplama (`Σ_il kombi_tuketim(il)`) çarpılıyor. Tutarlı marjinallerde
+  (toplamları eşit) IPF matematiksel olarak yakınsar — §6 madde 21'deki gibi bir dışa
+  dönük tutarsızlık riski burada yok, bu iç bir garanti.
 
 Modülün geri kalanı — ay içi normalizasyon (`gun_agirligi` toplamı 1, §6 madde 9), yerel gün
 sınırı (Karar 2 tuzak 1, UTC değil Europe/Istanbul), yıl sınırını aşan `theta_ref` ısınma payı
@@ -765,9 +793,14 @@ MWH_TO_KWH = 1000    # config/epias.py'da zaten var, tekrar tanımlanmayacak
 
 Adlandırılmış sabit olacak, satır içine gömülmeyecek (Adım 2'nin `MWH_TO_KWH` kuralı).
 
-Ölçek kontrolü: Marmara Ocak 154,6 m³/ay ≈ 1.645 kWh/ay. Elektriğin ~214 kWh/hane/ay'ının
-**7,7 katı** — TÜİK'in %48,3 gaz / %17,1 elektrik payıyla tutarlı. Bu oran doğrulama
-maddesi 14'tür.
+Ölçek kontrolü: Marmara Ocak 154,6 m³/ay **(abone başına, §4.4.1 — kombi hanesi başına
+DEĞİL)** ≈ 1.645 kWh/ay. Elektriğin ~214 kWh/hane/ay'ının (bu, hane başına) **7,7 katı** —
+TÜİK'in %48,3 gaz / %17,1 elektrik payıyla tutarlı. **Birim uyarısı:** bu oran iki farklı
+paydayı (gaz: abone, elektrik: hane) karşılaştırıyor — aynı sınıf hata (§4.4.1/Karar 4'ün
+dört kez yakaladığı abone/hane karışıklığının beşinci görünümü). Düzeltilmiş (kombi-hane
+başına, `karışım düzeltmesi=1,084` ile) değer ~142,6 m³/ay olurdu, oran ~7,1 katına düşer —
+yön ve mertebe değişmiyor, madde 14'ün kabaca doğrulandığı sonucu ayakta kalıyor, ama tam
+sayı burada değil, kabaca kontroldür. Bu oran doğrulama maddesi 14'tür.
 
 ---
 
@@ -825,7 +858,7 @@ döner, her madde `OK` / `FARKLI` etiketiyle ayrı yazdırılır.
 | 1 | `data/bdew/bdew_gas_sigmoid_coefficients.csv` başlığındaki kaynak paket/sürüm/tarih/formül/`wind_class` açıklaması dolu; katsayı sayısı beklenen |
 | 2 | `GAZ_DAGITIM_MAP` 11 ili tam kapsıyor, boşluk/çakışma yok. `'DOĞRULANACAK'` değeri **yalnızca** `config/gas.py`'daki `DAGITIM_MAP_BEKLEYEN`'de adı geçen iller için kabul edilir (2026-08-20 itibarıyla tam olarak `{77: 'Yalova'}`); listede olmayan bir ilde `'DOĞRULANACAK'` görülürse HATA. Ayrıca `len(DAGITIM_MAP_BEKLEYEN) <= 1` — liste büyürse HATA (bilinen eksik adı-konmuş bir istisna olarak kalmalı, "15/16 de olur" diye normalleşip gerçek bir kırılmayı gizlememeli) |
 | 3 | **İŞARET TESTİ:** her profil için `h(6) / h(26) > 1`; değer bantla birlikte yazdırılıyor (§4.2.1) |
-| 4 | **Türkiye kalibrasyonu — bant gerçek GAZBİR serisinden türetildi, proxy'den değil (2026-08-20, `data/gazbir/marmara_aylik_hane_m3.csv`):** gerçek Ocak/Ağustos oranı **12,47** (154,6/12,4), gerçek yıllık (12 ayın toplamı) **942,8 m³/hane**. Model (Faz 2 spike) Ocak/Ağustos=7,996, yıllık=953,0 vermişti — yıllık neredeyse birebir tutuyor (%1 fark), Ocak/Ağustos ise **%36 daha düz** (**bilinen, kabul edilmiş sapma** — §4.2.2 ve aşağıya bkz.). Bant bu nedenle iki parçalı: **yıllık m³/hane ∈ [850,1050]** (sıkı, gerçek değere yakın); **Ocak/Ağustos ∈ [6,14]** (geniş, modelin bilinen düzlüğünü kapsayacak şekilde — madde 12'nin il-bazlı bandıyla aynı). Isıtma-dışı pay ∈ [%20,%28] (TÜİK kaynaklı, GAZBİR aylık serisinde karşılığı yok, değişmedi). **Not: bu bant §4.3'ün IPF'i tarafından üzerine yazılır** — IPF yakınsadıktan sonra nihai Ocak/Ağustos oranı GAZBİR'in gerçek oranıdır (12,47), bu madde yalnızca h(θ)'nın makul bir ara ürün olduğunu doğrular, kesin kabul kriteri değildir |
+| 4 | **Türkiye kalibrasyonu — yıllık bant BİRİM DÜZELTMESİ (2026-08-21) + gerçek GAZBİR serisi (2026-08-20):** önceki bant `[850,1050]` (ve ondan önceki `[750,950]`) GAZBİR'in **abone başına** 942,8'inden türetilmişti — bu adımın çıktısı ise **kombi hanesi başına**, ve o değer meşru olarak daha yüksektir (abone ortalaması pişirme-amaçlı düşük tüketimli daire sayaçlarını ve merkezi bina kazanlarını da karıştırır, §4.4.1/Karar 4). Zincirin ima ettiği değer: `Σ kombi_tuketim / Σ kombi_hane = 6.574.277.830 / 6.149.023 ≈ 1.069 m³/hane/yıl`. **Yeni bant: yıllık m³/hane ∈ [950, 1.200]** (birim: kombi hanesi başına, abone başına DEĞİL). İl bazlı dağılım da raporlanmalı — İstanbul (yoğun, ılıman) bandın alt yarısında, iç kesim illeri (Edirne, Kırklareli, Bilecik — daha soğuk, daha düşük mesken_pay) üst yarısında beklenir; bu beklenti doğrulanmazsa madde şüpheli sayılmalı. **Ocak/Ağustos ∈ [6,14]** (geniş, modelin bilinen düzlüğünü kapsayacak şekilde — madde 12'nin il-bazlı bandıyla aynı; gerçek Ocak/Ağustos=12,47, model Faz 2 spike'ında 7,996 vermişti, **%36 daha düz**, bilinen kabul edilmiş sapma §4.2.2). Isıtma-dışı pay ∈ [%20,%28] (TÜİK kaynaklı, GAZBİR aylık serisinde karşılığı yok, değişmedi). **Not: bu bant §4.3'ün IPF'i tarafından üzerine yazılır** — IPF yakınsadıktan sonra nihai Ocak/Ağustos oranı GAZBİR'in gerçek oranıdır (12,47), bu madde yalnızca h(θ)'nın makul bir ara ürün olduğunu doğrular, kesin kabul kriteri değildir |
 | 5 | **Isınma payı:** pencere ilk 3 gününün `theta_ref`'i, 3 gün öncesi çekilmeden hesaplananla **farklı** (yani ısınma gerçekten uygulanmış) |
 | 6 | `theta_ref` fiziksel bantta (-15 … +40 °C); NaN/inf yok |
 | 7 | Zaman ekseninde boşluk yok: her il için beklenen gün sayısı kadar satır; eksik günler listeleniyor |
@@ -1093,9 +1126,10 @@ Bu formül ve bu katsayılar **spike ile çürütüldü, kullanılmıyor** — �
 
 11 il × 2025 takvim yılı gerçek günlük sıcaklık (Open-Meteo arşiv), kombi hane ağırlıklı
 Marmara ortalaması, düz Marmara EFH/MFH karışımı (%9,34/%90,66), tek çıpa GAZBİR Ocak
-2025=154,6 m³/hane:
+2025=154,6 m³ **(abone başına, §4.4.1 — spike zamanında ayrım kapanmamıştı; şekil testi
+olduğu için sonucu değiştirmez, bkz. §4.2.2)**:
 
-| `wind_class` | Ocak/Ağustos | ısıtma-dışı pay | yıllık m³/hane |
+| `wind_class` | Ocak/Ağustos | ısıtma-dışı pay | yıllık m³ (çıpa birimiyle: abone başına) |
 |---|---|---|---|
 | 0 | 6,706 | %24,5 | 989,8 |
 | **1 (seçilen)** | **7,996** | **%21,7** | **953,0** |
@@ -1117,7 +1151,8 @@ Ocak/Ağustos oranını 4,4–5,4'e düşürüyor, saf sigmoidin 8,0–9,7'sinde
 Merkezi haneleri abone sayan naif hesap: 5.608.412 – 6.091.153 → **%26–37 hata**.
 
 Seviye katmanına etkisi: abone başına ortalama = kombi dairesinin **1,26–1,36 katı** →
-GAZBİR'in 154,6 m³'ü abone başınaysa gerçek kombi dairesi **114–122 m³**.
+GAZBİR'in 154,6 m³'ü abone başına olduğu için (§4.4.1, KAPANDI — artık koşullu değil, kesin)
+gerçek kombi hanesi **114–122 m³/ay** (birim: kombi hanesi başına, abone başına DEĞİL).
 
 ### A.6 `ISITMA_TIPI_ORANLARI` düzeltmesinin patlama yarıçapı (Karar 4) — **EMPİRİK OLARAK DOĞRULANDI (2026-08-21)**
 
