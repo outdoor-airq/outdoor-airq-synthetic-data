@@ -858,7 +858,7 @@ döner, her madde `OK` / `FARKLI` etiketiyle ayrı yazdırılır.
 | 1 | `data/bdew/bdew_gas_sigmoid_coefficients.csv` başlığındaki kaynak paket/sürüm/tarih/formül/`wind_class` açıklaması dolu; katsayı sayısı beklenen |
 | 2 | `GAZ_DAGITIM_MAP` 11 ili tam kapsıyor, boşluk/çakışma yok. `'DOĞRULANACAK'` değeri **yalnızca** `config/gas.py`'daki `DAGITIM_MAP_BEKLEYEN`'de adı geçen iller için kabul edilir (2026-08-20 itibarıyla tam olarak `{77: 'Yalova'}`); listede olmayan bir ilde `'DOĞRULANACAK'` görülürse HATA. Ayrıca `len(DAGITIM_MAP_BEKLEYEN) <= 1` — liste büyürse HATA (bilinen eksik adı-konmuş bir istisna olarak kalmalı, "15/16 de olur" diye normalleşip gerçek bir kırılmayı gizlememeli) |
 | 3 | **İŞARET TESTİ:** her profil için `h(6) / h(26) > 1`; değer bantla birlikte yazdırılıyor (§4.2.1) |
-| 4 | **Türkiye kalibrasyonu — yıllık bant BİRİM DÜZELTMESİ (2026-08-21) + gerçek GAZBİR serisi (2026-08-20):** önceki bant `[850,1050]` (ve ondan önceki `[750,950]`) GAZBİR'in **abone başına** 942,8'inden türetilmişti — bu adımın çıktısı ise **kombi hanesi başına**, ve o değer meşru olarak daha yüksektir (abone ortalaması pişirme-amaçlı düşük tüketimli daire sayaçlarını ve merkezi bina kazanlarını da karıştırır, §4.4.1/Karar 4). Zincirin ima ettiği değer: `Σ kombi_tuketim / Σ kombi_hane = 6.574.277.830 / 6.149.023 ≈ 1.069 m³/hane/yıl`. **Yeni bant: yıllık m³/hane ∈ [950, 1.200]** (birim: kombi hanesi başına, abone başına DEĞİL). İl bazlı dağılım da raporlanmalı — İstanbul (yoğun, ılıman) bandın alt yarısında, iç kesim illeri (Edirne, Kırklareli, Bilecik — daha soğuk, daha düşük mesken_pay) üst yarısında beklenir; bu beklenti doğrulanmazsa madde şüpheli sayılmalı. **Ocak/Ağustos ∈ [6,14]** (geniş, modelin bilinen düzlüğünü kapsayacak şekilde — madde 12'nin il-bazlı bandıyla aynı; gerçek Ocak/Ağustos=12,47, model Faz 2 spike'ında 7,996 vermişti, **%36 daha düz**, bilinen kabul edilmiş sapma §4.2.2). Isıtma-dışı pay ∈ [%20,%28] (TÜİK kaynaklı, GAZBİR aylık serisinde karşılığı yok, değişmedi). **Not: bu bant §4.3'ün IPF'i tarafından üzerine yazılır** — IPF yakınsadıktan sonra nihai Ocak/Ağustos oranı GAZBİR'in gerçek oranıdır (12,47), bu madde yalnızca h(θ)'nın makul bir ara ürün olduğunu doğrular, kesin kabul kriteri değildir |
+| 4 | **Türkiye kalibrasyonu — yıllık bant BİRİM DÜZELTMESİ (2026-08-21) + gerçek GAZBİR serisi (2026-08-20):** önceki bant `[850,1050]` (ve ondan önceki `[750,950]`) GAZBİR'in **abone başına** 942,8'inden türetilmişti — bu adımın çıktısı ise **kombi hanesi başına**, ve o değer meşru olarak daha yüksektir (abone ortalaması pişirme-amaçlı düşük tüketimli daire sayaçlarını ve merkezi bina kazanlarını da karıştırır, §4.4.1/Karar 4). Zincirin ima ettiği değer: `Σ kombi_tuketim / Σ kombi_hane = 6.574.277.830 / 6.149.023 ≈ 1.069 m³/hane/yıl`. **Yeni bant: yıllık m³/hane ∈ [950, 1.200]** (birim: kombi hanesi başına, abone başına DEĞİL). İl bazlı dağılım da raporlanmalı — İstanbul (yoğun, düşük HDD) bandın alt yarısında, Edirne/Kırklareli/Bilecik (yüksek HDD, düşük mesken_pay) üst yarısında beklenir; bu beklentinin gerekçesi **HDD'dir (ısıtma derece-günü), yıllık ortalama sıcaklık DEĞİL** — 2026-08-25'te ölçülen gerçek Marmara HDD tablosu (madde 22, Ek A.4) bunu doğruluyor: Edirne yıllık ortalama sıcaklıkta 11 ilin yalnızca 7.'si ama HDD'de 3.'sü (karasal iklim: sıcak yaz ortalamayı yukarı çeker, kışın soğukluğunu gizler) — "kıyı=ılık, iç kesim=soğuk" sezgisi ortalama sıcaklıkla yanıltıcı çıkar, HDD ile tutarlıdır. Bu beklenti doğrulanmazsa madde şüpheli sayılmalı. **Ocak/Ağustos ∈ [6,14]** (geniş, modelin bilinen düzlüğünü kapsayacak şekilde — madde 12'nin il-bazlı bandıyla aynı; gerçek Ocak/Ağustos=12,47, model Faz 2 spike'ında 7,996 vermişti, **%36 daha düz**, bilinen kabul edilmiş sapma §4.2.2). Isıtma-dışı pay ∈ [%20,%28] (TÜİK kaynaklı, GAZBİR aylık serisinde karşılığı yok, değişmedi). **Not: bu bant §4.3'ün IPF'i tarafından üzerine yazılır** — IPF yakınsadıktan sonra nihai Ocak/Ağustos oranı GAZBİR'in gerçek oranıdır (12,47), bu madde yalnızca h(θ)'nın makul bir ara ürün olduğunu doğrular, kesin kabul kriteri değildir |
 | 5 | **Isınma payı:** pencere ilk 3 gününün `theta_ref`'i, 3 gün öncesi çekilmeden hesaplananla **farklı** (yani ısınma gerçekten uygulanmış) |
 | 6 | `theta_ref` fiziksel bantta (-15 … +40 °C); NaN/inf yok |
 | 7 | Zaman ekseninde boşluk yok: her il için beklenen gün sayısı kadar satır; eksik günler listeleniyor |
@@ -876,6 +876,7 @@ döner, her madde `OK` / `FARKLI` etiketiyle ayrı yazdırılır.
 | 19 | **Bölüntü testi (Karar 4 popülasyon düzeltmesi için, 2026-08-20 eklendi, 2026-08-21 iki kez düzeltildi — önce birim hatası, sonra totoloji):** `kombi_hane(il) + merkezi_hane(il) + soba_hane(il) + elektrikli_hane(il) == toplam_hane(il)` (tam eşitlik, tolerans yok) ve her kategori `≥ 0`. **Önceki hal (`kombi+merkezi ≤ toplam`) totolojikti** — `isitma_tipi` zaten hanelerin bir bölüntüsü olduğu için mevcut popülasyonla asla başarısız olamazdı, hiçbir şey yakalamıyordu. Bu hal Karar 4 düzeltmesinin en olası uygulama hatasını yakalar: bir kategoriyi (örn. kombiyi) çarpanla büyütüp diğerlerini aynı oranda küçültmeyi unutmak — toplam hane sayısı sessizce 8.529.528 olmaktan çıkar. Düzeltme bir yeniden dağıtım olmak ZORUNDADIR, yalnız bir kategoriye ekleme değil |
 | 20 | **Abone testi (2026-08-21 eklendi):** `Σ_il [mesken_tuketim(il) / 942,8] ≈ Σ_il konut_abone(il)`. Bu, seviye zincirinin (EPDK il tüketimi × 2022 mesken payı ÷ GAZBİR hane-başı) bağımsız ölçülmüş abone sayısına ne kadar yakın düştüğünü sınar. İstanbul için: ölçülen 5.485.643 (İGDAŞ, görsel okuma, düşük güven), zincirin ima ettiği 5.446.029 — **sapma %0,76**, eşik ±%5. **GEÇTİ.** Sapma ±%5'i aşarsa girdi zincirinden biri (EPDK 2022 oranı, 2025 seviyesi, ya da 942,8'in kendisi) bozuktur |
 | 21 | **Uzlaşım testi — hattaki TEK dışa dönük doğrulama, diğerleri iç tutarlılık (2026-08-21 eklendi, 2026-08-21'de il-bazlı raporlamaya genişletildi — kalıcı):** `Σ_il [(kombi_hane(il) + merkezi_hane(il) + merkezi_hane(il)/daire_per_bina) × boşluk_faktörü] ≈ Σ_il [mesken_tuketim(il) / 942,8]`. **Üç seviyeli çıktı, her koşuda:** (1) toplam sapma ±%5 → GEÇTİ/KALDI; (2) **il bazlı sapma tablosu HER KOŞUDA yazdırılır**, yalnız toplam değil — toplamın içinde bir ilin gerçek kırılması saklanmasın diye; (3) `|sapma(il)| > %15` → **UYARI** (başarısızlık değil), il adıyla listelenir. **Sonuç (2026-08-21, A/B sonrası, il bazlı):** İstanbul %-2,33 · Kocaeli %-6,17 · Sakarya %-5,27 · Bursa %-0,09 · Balıkesir %+1,55 · Çanakkale %+0,60 · Yalova %-3,60 · Tekirdağ %+1,68 · Edirne %-1,82 · **Kırklareli %-22,70 (UYARI)** · Bilecik %+1,74. Toplam sapma %-2,54 → **GEÇTİ**. Kırklareli tek başına eşiği aşıyor (en küçük popülasyon, %97 tavanının doğrudan sonucu, yöntemin en düşük mesken_pay'e sahip ilde en kırılgan olması — Kapı 2/3'te de tekrar eden bir örüntü); bu **bilinen ve kabul edilmiş** bir sapma, gizlenmiyor, UYARI olarak kayıtlı kalıyor. Bu madde geleceğe dönük kalıcı — Karar 4'ün girdi zinciri her değiştiğinde (yeni EPDK yılı, yeni İGDAŞ verisi vb.) yeniden koşulmalı |
+| 22 | **HDD referans tablosu kontrolü (2026-08-25 eklendi):** her ilin `build_gas_calibration.py` koşusunda ölçülen yıllık HDD'si (taban 18°C), 2026-08-25'te Open-Meteo'dan çekilen 2025 referans tablosuyla karşılaştırılır — Bilecik 2312 · Kırklareli 1963 · Edirne 1861 · Tekirdağ 1847 · Kocaeli 1764 · Yalova 1695 · Sakarya 1684 · Bursa 1670 · Balıkesir 1637 · İstanbul 1514 · Çanakkale 1469 (Ek A.8, `IL_KOORDINAT` ile aynı kaynak/tarih). **`\|HDD(il) − referans(il)\| / referans(il) > %20` → UYARI** — muhtemel sebep yanlış koordinat, yanlış yıl ya da bozuk cache; yıllar arası gerçek iklim değişimi bu bandın içinde kalır, bant bunu ayırt etmek için var. Makullük çapa notu: Marmara'nın 11 ilinin HDD'si 1469–2312 aralığında, MGM'nin Türkiye uzun-yıllar HDD ortalamasının (~2191) belirgin altında — Marmara'nın ülke geneline göre ılıman olması beklenen davranış, TS 825'in Marmara'yı 2.–3. iklim bölgesine koymasıyla tutarlı |
 
 Madde 3 ve 5 bu adımın en kritik iki kontrolüdür: ikisi de sessizce yanlış olabilecek,
 aşağı akışta hiçbir toplamı bozmayan hatalar yakalar. Geçmiyorsa kod ilerletilmez.
@@ -1196,3 +1197,45 @@ mantığını değiştirmesi, RNG akışını (draw sayısını) etkilememesi be
 
 Kalibrasyon artefaktının kendisi değişmedi: 11 il × 365 gün = **4.015 satır** (bu, kombi
 sayısından bağımsız — il×gün granülerliği).
+
+### A.8 İl merkezi koordinatları ve referans HDD tablosu (2026-08-25)
+
+**Koordinat kaynağı:** Open-Meteo Geocoding API (`geocoding-api.open-meteo.com/v1/search`,
+anahtar gerekmez, sıcaklık verisiyle aynı sağlayıcı) — her il için PPLA (idari merkez)
+kaydı programatik sorguyla çekildi, elle transkripsiyon YOK (bu adımda iki kez ısırdığımız
+sınıf hata — BDEW katsayıları, dağıtım şirketi haritası — aynı disiplinle önlendi).
+Sorgu il ADIYLA değil il MERKEZİ şehrin adıyla yapıldı: Kocaeli → "İzmit", Sakarya →
+"Adapazarı" (il adıyla arama bu ikisinde yanlış/alakasız köy kayıtları döndürüyordu).
+`config/gas.py::IL_KOORDINAT`'te donduruldu.
+
+| il | lat | lon | rakım (m) | T_ort 2025 (°C) | **HDD 2025 (taban 18°C)** |
+|---|---|---|---|---|---|
+| Bilecik | 40,14192 | 29,97932 | 517 | 13,11 | **2312** |
+| Kırklareli | 41,73508 | 27,22521 | 215 | 14,63 | **1963** |
+| Edirne | 41,67719 | 26,55597 | 62 | 15,56 | **1861** |
+| Tekirdağ | 40,97810 | 27,51101 | 44 | 14,92 | **1847** |
+| Kocaeli | 40,76499 | 29,92928 | 19 | 15,04 | **1764** |
+| Yalova | 40,65501 | 29,27693 | 9 | 15,39 | **1695** |
+| Sakarya | 40,78056 | 30,40333 | 34 | 15,11 | **1684** |
+| Bursa | 40,19559 | 29,06013 | 155 | 16,07 | **1670** |
+| Balıkesir | 39,64917 | 27,88611 | 139 | 16,06 | **1637** |
+| İstanbul | 41,01384 | 28,94966 | 39 | 16,13 | **1514** |
+| Çanakkale | 40,15552 | 26,41271 | 12 | 16,86 | **1469** |
+
+**Sıralamalar farklı ölçütlere göre farklı çıkıyor — kasıtlı, karıştırılmasın:** yıllık
+ortalama sıcaklığa göre en soğuk 3 il Bilecik/Kırklareli/Tekirdağ, HDD'ye göre en yüksek 3
+il Bilecik/Kırklareli/**Edirne** (Edirne T_ort'ta 7. sırada ama HDD'de 3. — karasal iklim:
+sıcak yaz yıllık ortalamayı yukarı çekiyor, kışın soğukluğunu gizliyor). **Gaz tüketimiyle
+ilgili doğru ölçüt HDD'dir, yıllık ortalama sıcaklık değil** — "kıyı=ılık, iç kesim=soğuk"
+sezgisi ortalama sıcaklıkla yanıltıcı çıkıyor (Yalova T_ort'ta orta sırada, kıyı ılıklığı
+beklenenden az), HDD ile tutarlı. Madde 4'ün il-bazlı beklentisi (İstanbul alt yarı,
+Edirne/Kırklareli/Bilecik üst yarı) bu HDD tablosuna dayanır.
+
+**Makullük çapası:** Marmara'nın 11 ilinin HDD'si 1469–2312 aralığında, MGM'nin Türkiye
+uzun-yıllar HDD ortalamasının (~2191) belirgin altında — Marmara'nın ülke geneline göre
+ılıman olması beklenen davranış, TS 825'in Marmara'yı 2.–3. iklim bölgesine koymasıyla
+tutarlı. Rakım kontrolü: hiçbir il şüpheli yükseklikte değil (9–517 m, dağ istasyonu yok;
+Bilecik'in 517 m'si gerçek — plato ili).
+
+Doğrulama madde 22 (§6): gelecekteki koşularda ölçülen HDD bu tablodan **>%20** sapıyorsa
+UYARI — muhtemel sebep yanlış koordinat, yanlış yıl ya da bozuk cache.

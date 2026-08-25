@@ -148,6 +148,63 @@ HDD_BASE_TEMP = 18       # HDD = max(0, HDD_BASE_TEMP - T_ortalama), MGM/Eurosta
 HEATING_THRESHOLD = 15   # gün-tipi ısıtma eşiği (katı yakıt şekli için, §4.5)
 
 
+# --- İl merkezi koordinatları (weather_client.py çağrıları için) ------------------
+# Kaynak: Open-Meteo Geocoding API (geocoding-api.open-meteo.com/v1/search) — sıcaklık
+# verisiyle AYNI sağlayıcı, anahtar gerekmez. Her il için PPLA (idari merkez/il merkezi)
+# kaydı programatik sorguyla çekildi (2026-08-25) — elle Wikipedia'dan kopyalanmadı
+# (bu adımda iki kez ısırdığımız sınıf hata: BDEW katsayıları ve dağıtım şirketi haritası
+# da bu yüzden programatik/doğrulanmış kaynaktan alındı, elle transkripsiyon değil).
+#
+# Sorgu il ADIYLA değil, il MERKEZİ şehrin adıyla yapıldı çünkü ikisi her zaman aynı
+# değil: Kocaeli ilinin merkezi İzmit, Sakarya ilinin merkezi Adapazarı (idari
+# değişiklikle il adı Sakarya'ya çevrilmiş şehir Adapazarı kalmış) — il adıyla arama bu
+# iki ilde yanlış/alakasız kayıtlar (küçük köyler, başka ülkeler) döndürüyordu, şehir
+# adıyla arama tek ve doğru PPLA kaydını verdi.
+#
+# Format: (lat, lon, rakım_m). Koordinat SABİT donduruldu (API sonucu zamanla
+# değişebilir/genişleyebilir; sabitlenmezse aynı tarih için farklı çağrılarda farklı
+# sıcaklık serisi üretilir, koşular yeniden üretilemez olur).
+IL_KOORDINAT_KAYNAK = "Open-Meteo Geocoding API (geocoding-api.open-meteo.com/v1/search), çekilme: 2026-08-25"
+IL_KOORDINAT = {
+    34: (41.01384, 28.94966, 39),    # İstanbul (PPLA, pop 15.701.602)
+    41: (40.76499, 29.92928, 19),    # Kocaeli — sorgu: "İzmit" (il merkezi), PPLA, pop 196.571
+    54: (40.78056, 30.40333, 34),    # Sakarya — sorgu: "Adapazarı" (il merkezi), PPLA, pop 286.787
+    16: (40.19559, 29.06013, 155),   # Bursa (PPLA, pop 3.101.833)
+    10: (39.64917, 27.88611, 139),   # Balıkesir (PPLA, pop 238.151)
+    17: (40.15552, 26.41271, 12),    # Çanakkale (PPLA, pop 143.622)
+    77: (40.65501, 29.27693, 9),     # Yalova (PPLA, pop 71.289)
+    59: (40.97810, 27.51101, 44),    # Tekirdağ (PPLA, pop 122.287)
+    22: (41.67719, 26.55597, 62),    # Edirne (PPLA, pop 180.002)
+    39: (41.73508, 27.22521, 215),   # Kırklareli (PPLA, pop 58.223)
+    11: (40.14192, 29.97932, 517),   # Bilecik (PPLA, pop 74.457) — plato ili, rakım gerçek
+}
+assert len(IL_KOORDINAT) == 11, f"IL_KOORDINAT 11 il yerine {len(IL_KOORDINAT)} il içeriyor"
+assert set(IL_KOORDINAT) == set(GAZ_DAGITIM_MAP), "IL_KOORDINAT ve GAZ_DAGITIM_MAP il kümesi uyuşmuyor"
+
+# Referans HDD tablosu (taban 18°C, Open-Meteo 2025, yukarıdaki koordinatlarla aynı
+# kaynak/tarih) — yönerge Ek A.8/doğrulama madde 22. Gelecekteki koşularda ölçülen HDD
+# bu tablodan >%20 saparsa UYARI: muhtemel sebep yanlış koordinat, yanlış yıl ya da bozuk
+# cache — yıllar arası gerçek iklim değişimi bu bandın içinde kalır.
+# DİKKAT: bu sıralama YILLIK ORTALAMA SICAKLIĞA göre DEĞİL, HDD'ye göredir — ikisi farklı
+# sıralar (örn. Edirne ortalama sıcaklıkta 11 ilin 7.'si ama HDD'de 3.'sü, karasal iklim:
+# sıcak yaz ortalamayı yukarı çekip kışın soğukluğunu gizliyor). Gaz tüketimiyle ilgili
+# doğru ölçüt HDD'dir.
+HDD_REFERANS_2025 = {
+    11: 2312,  # Bilecik
+    39: 1963,  # Kırklareli
+    22: 1861,  # Edirne
+    59: 1847,  # Tekirdağ
+    41: 1764,  # Kocaeli
+    77: 1695,  # Yalova
+    54: 1684,  # Sakarya
+    16: 1670,  # Bursa
+    10: 1637,  # Balıkesir
+    34: 1514,  # İstanbul
+    17: 1469,  # Çanakkale
+}
+assert set(HDD_REFERANS_2025) == set(IL_KOORDINAT), "HDD_REFERANS_2025 ve IL_KOORDINAT il kümesi uyuşmuyor"
+
+
 # --- Birim dönüşümü ----------------------------------------------------------------
 SM3_TO_KWH = 10.64  # BOTAŞ üst ısıl değer / EPDK faturalama katsayısı — DOĞRULANACAK
                      # (yönerge §4.6 ölçek çapraz kontrolü ile tutarlı, ama kaynak PDF
