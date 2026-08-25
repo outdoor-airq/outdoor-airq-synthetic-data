@@ -45,3 +45,9 @@ assert all(0.0 <= v <= 1.0 for v in FUEL_TYPE_KOMUR_ORANI.values()), "kömür or
 # yukarı ~1,7×; kısmi ısıtma davranışı → aşağı ~0,5–0,7×, bileşke) ORTASINA sabitlendi.
 # `# VARSAYIM` — `docs/PROGRESS.md`'ye ayrıca işlendi.
 SOBA_YAKIT_ENERJI_ORANI = 1.05
+
+# --- Doğrulama madde 24 (ZAYIF — mertebe kontrolü, DOĞRULAMA DEĞİL) ----------------
+# TÜİK'in alan ısıtma yüzdelerinden (kömür %21,6 + katı biyokütle %16,9 = %38,5) TÜRETİLMİŞ
+# kaba bir ulusal tahmin — okunmuş bir veri DEĞİL, bu yüzden katı yakıt katmanının
+# gazdaki madde 21/23 gibi bir dış çapası yok. Yalnız 10× mertebesinde bir hatayı yakalar.
+ULUSAL_KATI_YAKIT_ISITMA_TWH_TAHMINI = 90

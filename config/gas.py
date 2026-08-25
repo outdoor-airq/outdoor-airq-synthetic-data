@@ -211,6 +211,22 @@ SM3_TO_KWH = 10.64  # BOTAŞ üst ısıl değer / EPDK faturalama katsayısı �
                      # değil resmi bir tarife tebliği olmalı, henüz o teyit yapılmadı)
 
 
+# --- Abone↔hane çevirisi sabitleri (§4.4/§4.4.1, madde 20/21/23'ün dayandığı sayılar) --
+# Bu sayılar önceden yalnız ad-hoc doğrulama betiklerinde satır içi yazılıyordu
+# (validate_heating_calibration.py yazılırken fark edildi) — burada adlandırılıp
+# kaynaklarıyla donduruluyor — "gaz tarafında hiçbir sayı kaynağını yazmadan durmaz" kuralı.
+GAZBIR_HANE_BASI_M3_2025 = 942.8  # data/gazbir/marmara_aylik_hane_m3.csv yıllık toplamı —
+                                   # ABONE başına, karışık (kombi+merkezi) popülasyon (§4.4.1)
+KOMBI_DAIRE_YILLIK_M3 = 869.4      # İGDAŞ ölçümü — MERKEZ içermeyen mesken sınıflarının
+                                    # toplam tüketimi ÷ sayacı (§4.4.1, level_source=igdas_ilce)
+KARISIM_DUZELTME_ORANI = 942.8 / 869.4  # = 1,084 — GAZBIR_HANE_BASI_M3_2025/KOMBI_DAIRE_YILLIK_M3
+DAIRE_PER_BINA = 21.0  # İGDAŞ sayım tabanlı: 519.786 daire-sayacı ÷ 24.730 bina kazanı (§4.4)
+ISTANBUL_KONUT_ABONE_SAYISI_IGDAS = 5_485_643  # İGDAŞ, görsel okuma (grafik), düşük güven —
+                                                 # madde 20/21'in dış çapası; boşluk_faktörü'nün payı
+ISTANBUL_KOMBI_KONUT_BIRIMI_IGDAS = 4_436_039  # İGDAŞ sayım — MERKEZ içermeyen kullanım
+                                                 # sınıflarının sayaç toplamı (Karar 4), madde 23'ün çapası
+
+
 # --- Saatlik gaz şekli — TANIMLANIR AMA TÜKETİLMEZ ---------------------------------
 # Karar 2 (yönerge §2): saatlik dağılım bu adımda ÜRETİLMEZ, Adım 3b'de yayın anında
 # uygulanır. Burada yalnızca sözleşme yer tutucusu — Adım 2'nin AC_SEASONAL_DELTA_BY_MONTH
