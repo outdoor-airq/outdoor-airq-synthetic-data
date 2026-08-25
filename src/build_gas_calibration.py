@@ -26,7 +26,7 @@ from config.gas import (
     MFH_PAY,
     GAZ_DAGITIM_MAP,
     GAZ_DAGITIM_SIRKETI_DTYPE,
-    GAS_LEVEL_SOURCE_DTYPE,
+    HEATING_LEVEL_SOURCE_DTYPE,
     HEATING_SHAPE_SOURCE_DTYPE,
     TEMP_SOURCE_DTYPE,
     SM3_TO_KWH,
@@ -220,7 +220,7 @@ def build_gas_calibration(
     sonuc = pd.concat(satirlar, ignore_index=True)
     sonuc["gaz_dagitim_sirketi"] = sonuc["gaz_dagitim_sirketi"].astype(GAZ_DAGITIM_SIRKETI_DTYPE)
     sonuc["il_adi"] = sonuc["il_adi"].astype("category")
-    sonuc["level_source"] = sonuc["level_source"].astype(GAS_LEVEL_SOURCE_DTYPE)
+    sonuc["level_source"] = sonuc["level_source"].astype(HEATING_LEVEL_SOURCE_DTYPE)
     sonuc["shape_source"] = sonuc["shape_source"].astype(HEATING_SHAPE_SOURCE_DTYPE)
     sonuc["temp_source"] = sonuc["temp_source"].astype(TEMP_SOURCE_DTYPE)
     sonuc = sonuc.sort_values(["il_kodu", "tarih"]).reset_index(drop=True)

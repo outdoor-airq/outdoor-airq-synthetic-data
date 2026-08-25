@@ -223,8 +223,12 @@ assert abs(sum(HOURLY_GAS_SHAPE) - 1.0) < 1e-9
 
 
 # --- Provenance kategori sözlükleri (Adım 1/2 kuralı: global, önceden tanımlanmış) -
-GAS_LEVEL_SOURCE_DTYPE = pd.CategoricalDtype(
-    categories=['epdk_annual', 'gazbir_monthly', 'igdas_ilce', 'epdk_derived', 'synthetic'],
+HEATING_LEVEL_SOURCE_DTYPE = pd.CategoricalDtype(
+    # 'tuik_national_derived' katı yakıt (soba) modülünündür — yönergede üç yerde (§4.5,
+    # §5, §9 JSON örneği) adı geçiyordu ama bu listeye hiç girmemişti (2026-08-25'te
+    # build_solid_fuel_calibration.py ilk koşusunda NULL kategori hatasıyla yakalandı).
+    categories=['epdk_annual', 'gazbir_monthly', 'igdas_ilce', 'epdk_derived',
+                'tuik_national_derived', 'synthetic'],
     ordered=False,
 )
 
