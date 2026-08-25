@@ -278,16 +278,31 @@ def dogrula_madde12b(solid_df: pd.DataFrame):
 # --- Değer sağlığı -------------------------------------------------------------------
 
 def dogrula_madde13(gas_df: pd.DataFrame, solid_df: pd.DataFrame):
-    # Üst sınır 2026-08-25'te 12 -> 18 m³/gün genişletildi — §4.3.2 "Mart anomalisi" (aynı
-    # gerekçe madde 12'yle: kayma hipotezi reddedildi, Mart'ın gerçek yüksekliği doğrulandı).
+    # Üst sınır 12 m³/gün — DEĞİŞMEDİ (2026-08-25'teki [0,3-18] genişletmesi GERİ ALINDI,
+    # DAGITIM_MAP_BEKLEYEN deseniyle: kör bant genişletmesi yerine adı-konmuş dar istisna).
+    # Yalnız MART_2025_ANOMALISI=True iken 2025-03 satırları muaf tutulur, AYRI SAYILIR;
+    # Mart DIŞINDA 12'yi aşan tek satır bile başarısızlıktır (§4.3.2).
+    from config.gas import MART_2025_ANOMALISI
+
     g = gas_df["gunluk_hane_m3"]
-    g_ihlal = int(((g <= 0) | g.isna() | np.isinf(g) | (g < 0.3) | (g > 18)).sum())
+    temel_ihlal = (g <= 0) | g.isna() | np.isinf(g) | (g < 0.3) | (g > 12)
+    mart_muaf = MART_2025_ANOMALISI & (gas_df["tarih"].dt.month == 3)
+    mart_ihlal_sayisi = int((temel_ihlal & mart_muaf).sum())
+    mart_disi_ihlal = gas_df[temel_ihlal & ~mart_muaf]
+    g_ihlal = len(mart_disi_ihlal)
+
     s = solid_df["gunluk_hane_kwh"]
     s_ihlal = int(((s < 0) | s.isna() | np.isinf(s)).sum())
+
     gecti = g_ihlal == 0 and s_ihlal == 0
     durum = "OK" if gecti else "FARKLI"
-    detay = (f"gaz: ihlal={g_ihlal} (bant [0,3-18] m³/gün, aralık [{g.min():.3f},{g.max():.3f}]); "
-             f"katı yakıt: ihlal={s_ihlal} (≥0 olmalı, yazın 0 meşru, min={s.min():.3f})")
+    detay = (f"gaz: bant [0,3-12] m³/gün, Mart-dışı ihlal={g_ihlal}, Mart 2025 muaf (ayrı sayılan)={mart_ihlal_sayisi}; ")
+    if g_ihlal:
+        from config.provinces import IL_KODU
+        detay += (f"Mart-dışı ihlaller: " +
+                  ", ".join(f"{IL_KODU[r.il_kodu]} {r.tarih.date()} ({r.gunluk_hane_m3:.2f} m³, θ={r.theta_ref:.2f}°C)"
+                            for r in mart_disi_ihlal.itertuples()) + "; ")
+    detay += f"katı yakıt: ihlal={s_ihlal} (≥0 olmalı, yazın 0 meşru, min={s.min():.3f})"
     return durum, detay
 
 

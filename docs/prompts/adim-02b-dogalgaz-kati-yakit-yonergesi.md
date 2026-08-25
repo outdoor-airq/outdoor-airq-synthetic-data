@@ -745,11 +745,25 @@ büyümenin kendisinin nedeni açıklanmıyor — **kök sebep tam doğrulanamad
 olasılığı elendi.**
 
 **Sonuç: `data/gazbir/marmara_aylik_hane_m3.csv` DEĞİŞTİRİLMEDİ** (kayma yok, düzeltilecek bir
-şey yok). Bunun yerine doğrulama madde 12 (il bazlı Ocak/Ağustos bandı [6,14]→**[6,18]**) ve
-madde 13 (günlük üst sınır 12→**18** m³/gün) gerekçeli olarak genişletildi — Mart'ın gerçek
-yüksekliğini kapsayacak şekilde. Bu, bir hatayı gizlemek değil: `validate_heating_calibration.py`
-tam olarak amaçlandığı gibi çalıştı, gerçek bir veri özelliğini (Mart anomalisi) yakaladı, biz de
-onu araştırıp (kayma değil) gerekçeli bir bant genişletmesiyle kayda geçirdik.
+şey yok). İki madde İKİ FARKLI biçimde ele alındı, kör bir "ikisini de genişlet" yaklaşımı
+**terk edildi (2026-08-25, ikinci düzeltme turu):**
+
+- **Madde 12 (kalıcı bant düzeltmesi):** il bazlı Ocak/Ağustos bandı [6,14]→**[6,18]**. Bu bir
+  istisna değil — bant zaten yanlış kurulmuştu (Marmara toplamının 12,47'sine bakılarak, ama
+  toplam İstanbul'un nüfus ağırlığıyla aşağı çekiliyor; karasal illerin genliği fiziksel olarak
+  daha yüksek olmalı). Mart anomalisi ortadan kalksa bile bu bant [6,18] kalır.
+- **Madde 13 (adı-konmuş dar istisna, `DAGITIM_MAP_BEKLEYEN` deseniyle):** günlük üst sınır
+  **12 m³/gün'de KALDI** — genişletilmedi. Yerine `config/gas.py::MART_2025_ANOMALISI=True`
+  bayrağı yalnız **2025-03** satırlarını muaf tutuyor (59/76 sapan satır), AYRI SAYILIYOR;
+  Mart DIŞINDA 12'yi aşan hiçbir satır muaf değil. **Kalan 17 satır (Ocak/Şubat'ta gerçek soğuk
+  günler [θ_ref −3,34…+3,67°C] + 8 Nisan, il dağılımı Kırklareli 10/Kocaeli 4/Bursa 3, hepsi
+  12'yi az aşıyor [max 13,12]) Mart anomalisiyle açıklanamıyor — AYRI, henüz çözülmemiş bir
+  bulgu, madde 13 bu yüzden KALDI durumunda kalıyor.**
+
+Bu, bir hatayı gizlemek değil: `validate_heating_calibration.py` tam olarak amaçlandığı gibi
+çalıştı, iki farklı veri özelliğini (Mart anomalisi + soğuk-gün Kırklareli/Kocaeli/Bursa
+sapması) birbirinden ayırt edip ikisini de kayda geçirdi — ilki kalıcı bir bant düzeltmesi,
+ikincisi hâlâ açık bir bulgu.
 
 ### 4.4 Abone ↔ hane çevirisi — birim sözleşmesi
 
@@ -919,8 +933,8 @@ döner, her madde `OK` / `FARKLI` etiketiyle ayrı yazdırılır.
 | 9 | `gun_agirligi` her (il, ay) için toplamı **1,0 ± 1e-9** |
 | 10 | **IPF marjinal 1:** her il için yıllık toplam, EPDK il tüketimine **±%0,1** |
 | 11 | **IPF marjinal 2:** her ay için Marmara toplamı, GAZBİR aylığına **±%0,1** |
-| 12 | Gaz: Mevsimsel asimetri (Ocak toplamı / Ağustos toplamı) her il için ∈ **[6, 18]** (2026-08-25'te [6,14]'ten genişletildi — bkz. §4.3.2 "Mart anomalisi", faturalama-dönemi hipotezi test edilip REDDEDİLDİ, genişletme gerekçeli). Marmara-geneli GAZBİR ölçümü (12,47, madde 4a) bandın ortasında; il bazlı genlik Mart'ın gerçek yüksekliği yüzünden bunun üzerine çıkabiliyor (ölçülen: Bilecik 14,77, Edirne 16,57, Kırklareli 14,84, Tekirdağ 14,03 — hepsi yeni bandın içinde). **Katı yakıt: bu oran tanımsız (payda 0), yerine** Haziran–Ağustos toplamı tam 0; Aralık–Şubat toplamı yıllık toplamın %55–%75'i (Karar 5) |
-| 13 | `gunluk_hane_m3 > 0`, NaN/inf yok; makullük bandı 0,3 – **18** m³/gün (2026-08-25'te 12'den genişletildi — bkz. §4.3.2; hane başı, `# VARSAYIM`) |
+| 12 | Gaz: Mevsimsel asimetri (Ocak toplamı / Ağustos toplamı) her il için ∈ **[6, 18]** (2026-08-25'te [6,14]'ten genişletildi — **bant düzeltmesi, istisna değil**, kalıcı). Gerekçe: bant Marmara toplamının değerine (12,47) bakılarak kurulmuştu; toplam İstanbul'un nüfus ağırlığıyla aşağı çekiliyor (İstanbul kombi hanelerin %43'ü). Karasal illerin (Edirne, Kırklareli, Bilecik, Tekirdağ) genliği fiziksel olarak daha yüksektir — Marmara ortalaması bunu SEYRELTİYOR, il bazlı bant Marmara ortalamasından türetilemez. Ölçülen: Bilecik 14,77, Edirne 16,57, Kırklareli 14,84, Tekirdağ 14,03 — hepsi yeni bandın içinde. §4.3.2'deki Mart anomalisiyle KISMEN örtüşüyor (Ocak/Ağustos oranını Mart etkilemiyor ama aynı karasal illerin genel yüksek genliğinin bir parçası) ama bu bandın kendisi Mart'a özgü bir istisna değil, kalıcı bir düzeltmedir. **Katı yakıt: bu oran tanımsız (payda 0), yerine** Haziran–Ağustos toplamı tam 0; Aralık–Şubat toplamı yıllık toplamın %55–%75'i (Karar 5) |
+| 13 | `gunluk_hane_m3 > 0`, NaN/inf yok; makullük bandı 0,3 – **12** m³/gün (hane başı, `# VARSAYIM`) — **DEĞİŞMEDİ (2026-08-25'teki [0,3-18] genişletmesi GERİ ALINDI).** Yerine `config/gas.py::MART_2025_ANOMALISI` bayrağı (`DAGITIM_MAP_BEKLEYEN` deseniyle, adı-konmuş dar istisna): `True` iken yalnız **2025-03** satırları bu bantan muaf tutulur, AYRI SAYILIR ve sayısı her koşuda yazdırılır — Mart DIŞINDA 12'yi aşan tek satır bile başarısızlıktır. **Ölçülen (2026-08-25): 76 sapan satırın 59'u Mart (muaf), 17'si Mart DIŞI** — 16'sı Ocak/Şubat'ta gerçek soğuk günlerde (θ_ref −3,34…+3,67°C), 1'i 8 Nisan'da; hepsi 12'yi az aşıyor (max 13,12); il dağılımı Kırklareli 10, Kocaeli 4, Bursa 3 — Mart anomalisiyle açıklanamayan AYRI bir bulgu, henüz çözülmedi, madde bu yüzden KALDI durumunda kayıtlı kalıyor |
 | 14 | **KOŞULLU (2026-08-25 netleştirildi) — Ölçek çapraz kontrolü:** Ocak `gunluk_hane_kwh × 31`, aynı ayın elektrik `ortalama_hane_kwh` toplamının 5–10 katı (§4.6). `calibration_electricity.parquet` Adım 2 branch'ine ait — bu branch'te bulunamazsa madde **ATLANDI** etiketiyle geçilir, başarısız SAYILMAZ; sebebi (dosya bulunamadı) yazdırılır |
 | ~~15~~ | **SİLİNDİ (2026-08-25).** Eski metin: "Abone tutarlılığı: §4.4 ile çözülen `penetrasyon(il)` ∈ [0,7 , 1,0]; bant dışı iller tek tek listeleniyor." Bu madde **uygulanamaz**: `penetrasyon(il)`'in paydası `abone_mesken(il)` hiçbir kaynakta bulunamadı — GAZBİR'in yıllık raporu yalnız taranmış (scanned) bir flip-book, OCR bilinçli olarak reddedildi (yönerge §0.1/Kapı 2). Yerine geçen kontroller zaten var ve hane havuzunu dış veriye karşı sınama amacını gerçekten yapılabilir biçimde karşılıyor: **madde 20** (abone testi, İstanbul), **madde 21** (dış uzlaşım, il bazlı), **madde 23** (İstanbul dış çapası) — madde 15 sessizce kaybolmuyor, yerini bu üçü dolduruyor |
 | 16 | `Σ kombi_hane` = **6.149.023**, `Σ soba_hane` = **486.046** — `households.parquet` ile tam eşitlik, tolerans yok (Karar 4'ün A/B revizyonu sonrası sayılar, 2026-08-21; ilk tur — A/B'siz — 6.396.834/296.564 vermişti, o da 4.401.560/660.949'un düzeltmesiydi) |

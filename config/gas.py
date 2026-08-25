@@ -204,6 +204,16 @@ HDD_REFERANS_2025 = {
 }
 assert set(HDD_REFERANS_2025) == set(IL_KOORDINAT), "HDD_REFERANS_2025 ve IL_KOORDINAT il kümesi uyuşmuyor"
 
+# `DAGITIM_MAP_BEKLEYEN` deseniyle aynı: adı-konmuş, kapsamı dar bir istisna — kalabalığın
+# içinde kaybolan sessiz bir gevşeme değil. GAZBİR'in gerçek 2025 serisinde Mart, Ocak/Şubat'tan
+# yüksek (yönerge §4.3.2 "Mart anomalisi") — faturalama-dönemi kayması Test 1 ile REDDEDİLDİ
+# (GAZBİR'in bildirdiği Marmara sıcaklığı kendi ölçtüğümüz takvim ayına ±0,2°C içinde eşleşti),
+# kök sebep (abone tüketiminin YoY %31 artışı) yalnız KISMEN açıklanabildi. Bu bayrak yalnızca
+# doğrulama madde 13'ün 2025-03 satırlarını muaf tutması için var — Mart DIŞINDAKİ satırlar
+# istisna kapsamında DEĞİL, 12 m³/gün tavanına tabi kalır. Anomali bir gün açıklanır ya da
+# 2026 verisiyle çalışılırsa bu bayrak `False`'a çekilir ve bant kendiliğinden sıkılaşır.
+MART_2025_ANOMALISI = True
+
 
 # --- Birim dönüşümü ----------------------------------------------------------------
 SM3_TO_KWH = 10.64  # BOTAŞ üst ısıl değer / EPDK faturalama katsayısı — DOĞRULANACAK
