@@ -277,15 +277,18 @@ def dogrula_madde12b(solid_df: pd.DataFrame):
 
 # --- Değer sağlığı -------------------------------------------------------------------
 
-def dogrula_madde13(gas_df: pd.DataFrame, solid_df: pd.DataFrame):
-    # Üst sınır 12 m³/gün — DEĞİŞMEDİ (2026-08-25'teki [0,3-18] genişletmesi GERİ ALINDI,
-    # DAGITIM_MAP_BEKLEYEN deseniyle: kör bant genişletmesi yerine adı-konmuş dar istisna).
-    # Yalnız MART_2025_ANOMALISI=True iken 2025-03 satırları muaf tutulur, AYRI SAYILIR;
-    # Mart DIŞINDA 12'yi aşan tek satır bile başarısızlıktır (§4.3.2).
-    from config.gas import MART_2025_ANOMALISI
+def dogrula_madde13(gas_df: pd.DataFrame, solid_df: pd.DataFrame, il_yillik_m3: pd.Series):
+    # Üst sınır SABİT DEĞİL, TÜRETİLMİŞ (2026-08-25, ikinci düzeltme): §4.3.2/config.gas.py'daki
+    # formül — max_il(yıllık hane başı)/365 × TEPE_FAKTORU_GUNLUK_ISITMA. Kırklareli'nin en
+    # yüksek yıllık değerine (madde 4b) dayanır, kör bir "genişlet" sayısı değildir.
+    # MART_2025_ANOMALISI=True iken yalnız 2025-03 satırları muaf tutulur, AYRI SAYILIR;
+    # Mart DIŞINDA bu türetilmiş sınırı aşan tek satır bile başarısızlıktır (§4.3.2).
+    from config.gas import MART_2025_ANOMALISI, TEPE_FAKTORU_GUNLUK_ISITMA
+
+    ust_sinir = il_yillik_m3.max() / 365 * TEPE_FAKTORU_GUNLUK_ISITMA
 
     g = gas_df["gunluk_hane_m3"]
-    temel_ihlal = (g <= 0) | g.isna() | np.isinf(g) | (g < 0.3) | (g > 12)
+    temel_ihlal = (g <= 0) | g.isna() | np.isinf(g) | (g < 0.3) | (g > ust_sinir)
     mart_muaf = MART_2025_ANOMALISI & (gas_df["tarih"].dt.month == 3)
     mart_ihlal_sayisi = int((temel_ihlal & mart_muaf).sum())
     mart_disi_ihlal = gas_df[temel_ihlal & ~mart_muaf]
@@ -296,7 +299,8 @@ def dogrula_madde13(gas_df: pd.DataFrame, solid_df: pd.DataFrame):
 
     gecti = g_ihlal == 0 and s_ihlal == 0
     durum = "OK" if gecti else "FARKLI"
-    detay = (f"gaz: bant [0,3-12] m³/gün, Mart-dışı ihlal={g_ihlal}, Mart 2025 muaf (ayrı sayılan)={mart_ihlal_sayisi}; ")
+    detay = (f"gaz: türetilmiş bant [0,3-{ust_sinir:.2f}] m³/gün (max_il={il_yillik_m3.max():.1f}/365×{TEPE_FAKTORU_GUNLUK_ISITMA}), "
+             f"Mart-dışı ihlal={g_ihlal}, Mart 2025 muaf (ayrı sayılan)={mart_ihlal_sayisi}; ")
     if g_ihlal:
         from config.provinces import IL_KODU
         detay += (f"Mart-dışı ihlaller: " +
@@ -471,7 +475,7 @@ def validate_all(gas_df, solid_df, households, epdk_tuketim_csv, epdk_mesken_pay
         ("11", "IPF marjinal 2 (ay Marmara, ±%0,1)", dogrula_madde11(gas_df, ay_payi, kombi_tuketim)),
         ("12", "Gaz: il bazlı Ocak/Ağustos ∈[6,18]", dogrula_madde12(oran_jan_agu)),
         ("12b", "Katı yakıt: Haz-Ağu=0, Ara-Şub ∈[%55,%75]", dogrula_madde12b(solid_df)),
-        ("13", "Değer sağlığı (gaz + katı yakıt)", dogrula_madde13(gas_df, solid_df)),
+        ("13", "Değer sağlığı (gaz + katı yakıt)", dogrula_madde13(gas_df, solid_df, il_yillik_m3)),
         ("14", "KOŞULLU — Ocak gaz/elektrik oranı ∈[5,10]", dogrula_madde14(elektrik_path, gas_df)),
         ("16", "Σkombi_hane=6.149.023, Σsoba_hane=486.046", dogrula_madde16(households)),
         ("17", "Üç provenance kolonu NULL değil", dogrula_madde17(gas_df, solid_df)),

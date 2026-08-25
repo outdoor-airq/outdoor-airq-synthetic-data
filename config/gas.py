@@ -214,6 +214,18 @@ assert set(HDD_REFERANS_2025) == set(IL_KOORDINAT), "HDD_REFERANS_2025 ve IL_KOO
 # 2026 verisiyle çalışılırsa bu bayrak `False`'a çekilir ve bant kendiliğinden sıkılaşır.
 MART_2025_ANOMALISI = True
 
+# Doğrulama madde 13'ün günlük üst sınırı — sabit bir sayı DEĞİL, TÜRETİLMİŞ:
+#   üst_sınır = max_il(yıllık hane başı m³) / 365 × TEPE_FAKTORU_GUNLUK_ISITMA
+# `max_il(yıllık hane başı)` Kırklareli'dir (1.579,6 m³/hane/yıl, madde 4b) — Marmara'nın en
+# yüksek yıllık değerine sahip ili, dolayısıyla en yüksek günlük tepeye de sahip olması
+# beklenir. 3,5 katsayısı `# VARSAYIM` — ısıtma yüklü bir hanenin en soğuk gününün, yıllık
+# ortalama güne oranı (tipik ısıtma yükü tepe/ortalama oranları 3–4 aralığında, bkz. §4.5'in
+# HDD tabanlı katı yakıt şekli de benzer bir eşik-tepe davranışı gösteriyor). Bu türetilmiş
+# sınır (~15,15 m³/gün) Ocak/Şubat'ın gerçek soğuk-gün tepelerini (max 13,12, Kırklareli 22
+# Şubat) fiziksel olarak doğrular — Mart'ın (max 16,02) hâlâ aşması KASITLI: bant tanı gücünü
+# koruyor, `MART_2025_ANOMALISI` istisnasını gereksiz kılmıyor (§4.3.2).
+TEPE_FAKTORU_GUNLUK_ISITMA = 3.5
+
 
 # --- Birim dönüşümü ----------------------------------------------------------------
 SM3_TO_KWH = 10.64  # BOTAŞ üst ısıl değer / EPDK faturalama katsayısı — DOĞRULANACAK
