@@ -244,11 +244,16 @@ def dogrula_madde11(gas_df: pd.DataFrame, ay_payi: pd.Series, kombi_tuketim: pd.
 # --- Mevsimsellik --------------------------------------------------------------------
 
 def dogrula_madde12(oran_jan_agu: pd.Series):
-    disi = oran_jan_agu[(oran_jan_agu < 6) | (oran_jan_agu > 14)]
+    # Bant 2026-08-25'te [6,14] -> [6,18] genişletildi — §4.3.2 "Mart anomalisi": faturalama
+    # dönemi kayması hipotezi Test 1 ile REDDEDİLDİ (GAZBİR'in bildirdiği Marmara sıcaklıkları
+    # kendi Open-Meteo verimizin aynı takvim ayıyla ±0,2°C içinde eşleşti), Mart'ın GAZBİR
+    # serisinde gerçekten Ocak/Şubat'tan yüksek olduğu doğrulandı — il bazlı genlik buna göre
+    # genişledi, bant da gerekçeli genişletildi.
+    disi = oran_jan_agu[(oran_jan_agu < 6) | (oran_jan_agu > 18)]
     gecti = len(disi) == 0
     durum = "OK" if gecti else "FARKLI"
     if gecti:
-        detay = f"11/11 il ∈[6,14] (min={oran_jan_agu.min():.2f}, max={oran_jan_agu.max():.2f})"
+        detay = f"11/11 il ∈[6,18] (min={oran_jan_agu.min():.2f}, max={oran_jan_agu.max():.2f})"
     else:
         detay = f"bant dışı iller: {[(IL_KODU[k], round(v,2)) for k, v in disi.items()]}"
     return durum, detay
@@ -273,13 +278,15 @@ def dogrula_madde12b(solid_df: pd.DataFrame):
 # --- Değer sağlığı -------------------------------------------------------------------
 
 def dogrula_madde13(gas_df: pd.DataFrame, solid_df: pd.DataFrame):
+    # Üst sınır 2026-08-25'te 12 -> 18 m³/gün genişletildi — §4.3.2 "Mart anomalisi" (aynı
+    # gerekçe madde 12'yle: kayma hipotezi reddedildi, Mart'ın gerçek yüksekliği doğrulandı).
     g = gas_df["gunluk_hane_m3"]
-    g_ihlal = int(((g <= 0) | g.isna() | np.isinf(g) | (g < 0.3) | (g > 12)).sum())
+    g_ihlal = int(((g <= 0) | g.isna() | np.isinf(g) | (g < 0.3) | (g > 18)).sum())
     s = solid_df["gunluk_hane_kwh"]
     s_ihlal = int(((s < 0) | s.isna() | np.isinf(s)).sum())
     gecti = g_ihlal == 0 and s_ihlal == 0
     durum = "OK" if gecti else "FARKLI"
-    detay = (f"gaz: ihlal={g_ihlal} (bant [0,3-12] m³/gün, aralık [{g.min():.3f},{g.max():.3f}]); "
+    detay = (f"gaz: ihlal={g_ihlal} (bant [0,3-18] m³/gün, aralık [{g.min():.3f},{g.max():.3f}]); "
              f"katı yakıt: ihlal={s_ihlal} (≥0 olmalı, yazın 0 meşru, min={s.min():.3f})")
     return durum, detay
 
@@ -447,7 +454,7 @@ def validate_all(gas_df, solid_df, households, epdk_tuketim_csv, epdk_mesken_pay
         ("9", "gun_agirligi toplamı 1 (gaz:ay, katı:yıl)", dogrula_madde9(gas_df, solid_df)),
         ("10", "IPF marjinal 1 (il yıllık, ±%0,1)", dogrula_madde10(gas_df, kombi_tuketim)),
         ("11", "IPF marjinal 2 (ay Marmara, ±%0,1)", dogrula_madde11(gas_df, ay_payi, kombi_tuketim)),
-        ("12", "Gaz: il bazlı Ocak/Ağustos ∈[6,14]", dogrula_madde12(oran_jan_agu)),
+        ("12", "Gaz: il bazlı Ocak/Ağustos ∈[6,18]", dogrula_madde12(oran_jan_agu)),
         ("12b", "Katı yakıt: Haz-Ağu=0, Ara-Şub ∈[%55,%75]", dogrula_madde12b(solid_df)),
         ("13", "Değer sağlığı (gaz + katı yakıt)", dogrula_madde13(gas_df, solid_df)),
         ("14", "KOŞULLU — Ocak gaz/elektrik oranı ∈[5,10]", dogrula_madde14(elektrik_path, gas_df)),

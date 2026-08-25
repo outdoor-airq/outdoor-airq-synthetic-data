@@ -706,6 +706,51 @@ verir. Bu, `adim-02 §4.2`'nin açık bıraktığı delik için elimizdeki ilk a
 Gaz oranı elektrik oranı değildir — ama eldeki tek işarettir. Elektrik tarafına uygulanması
 ayrı bir karar ve ayrı bir adımdır.
 
+#### 4.3.2 Mart anomalisi — faturalama-dönemi hipotezi test edildi, REDDEDİLDİ (2026-08-25)
+
+`validate_heating_calibration.py`'ın ilk koşusu madde 12/13'ü kaldırdı: GAZBİR'in gerçek 2025
+serisinde **Mart (182,5 m³) Ocak'tan (154,6) ve Şubat'tan (176,2) yüksek** — IPF bunu Marmara
+aylık toplamına birebir kilitlediği için soğuk illerin (Bilecik, Edirne, Kırklareli, Tekirdağ)
+Ocak/Ağustos oranı ve bazı Mart günlerinin `gunluk_hane_m3`'ü eski bantları aştı.
+
+**Hipotez (test edilmeden önce):** GAZBİR'in "Mart" etiketli değeri aslında faturalama dönemi
+olabilir, takvim ayı değil — bir aylık kayma varsa "Mart" gerçekte Şubat'ın soğukluğunu taşıyor
+olabilir ve seri düzeltilmeli.
+
+**Test 1 (kesin, ek veri gerektirmedi):** GAZBİR'in aylık sektör raporları (sayfa 9,
+"Türkiye'deki Coğrafi Bölgelerin ⟨Ay⟩ Ayı Ortalama Hane Başı Konut Tüketimleri ve Sıcaklık
+Karşılaştırması") Marmara için ayrıca bir sıcaklık değeri de veriyor. Üç ayın PDF'i (Ocak,
+Şubat, Mart) doğrudan indirilip (`gazbir.org.tr/uploads/file/⟨Ay⟩-2025-Sektor-Raporu.pdf`)
+metni çıkarıldı, GAZBİR'in bildirdiği Marmara sıcaklığı kendi Open-Meteo verimizin aynı
+takvim ayı ortalamasıyla (kombi-hane ağırlıklı) karşılaştırıldı:
+
+| Ay | GAZBİR'in bildirdiği Marmara sıcaklığı | Bizim ölçtüğümüz (aynı takvim ayı) |
+|---|---|---|
+| Ocak | 8,4°C | 8,34°C |
+| Şubat | 4,5°C | 4,36°C |
+| Mart | 11,6°C | 11,40°C |
+
+Üçü de kendi takvim ayına ±0,2°C içinde eşleşiyor — **kayma YOK, seri takvim ayıdır, GAZBİR'in
+"Mart" değeri gerçekten Mart 2025'e ait.** Test 2 (HDD lag-korelasyonu) gerekmedi, Test 1 kesin
+sonuç verdi.
+
+**Mart gerçekten yüksek — sebebi kısmen açıklanabilir, tam doğrulanamadı.** GAZBİR'in kendi
+Mart raporu iki ayrı sinyal veriyor: (1) "2025 yılı Mart ayı ortalama sıcaklığı, uzun yıllar
+ortalamasının 3°C üzerinde gerçekleşerek 10,7°C olmuştur" (Türkiye geneli) — Mart nesnel olarak
+ılık bir aydı, salt sıcaklık daha DÜŞÜK tüketim beklettirir, tam tersi gözlendi; (2) ama aynı
+rapor "Abonelerin tüketimi bir önceki yılın aynı dönemine göre **%31** artmıştır" diyor —
+Ocak'ın %14'ü ve Şubat'ın %5'inin belirgin üzerinde. Bu, sıcaklıktan bağımsız bir abone/kapasite
+büyümesi sinyali olabilir (yeni bağlantılar, tarife değişikliği vb.) ama GAZBİR raporlarında bu
+büyümenin kendisinin nedeni açıklanmıyor — **kök sebep tam doğrulanamadı, yalnızca kayma
+olasılığı elendi.**
+
+**Sonuç: `data/gazbir/marmara_aylik_hane_m3.csv` DEĞİŞTİRİLMEDİ** (kayma yok, düzeltilecek bir
+şey yok). Bunun yerine doğrulama madde 12 (il bazlı Ocak/Ağustos bandı [6,14]→**[6,18]**) ve
+madde 13 (günlük üst sınır 12→**18** m³/gün) gerekçeli olarak genişletildi — Mart'ın gerçek
+yüksekliğini kapsayacak şekilde. Bu, bir hatayı gizlemek değil: `validate_heating_calibration.py`
+tam olarak amaçlandığı gibi çalıştı, gerçek bir veri özelliğini (Mart anomalisi) yakaladı, biz de
+onu araştırıp (kayma değil) gerekçeli bir bant genişletmesiyle kayda geçirdik.
+
 ### 4.4 Abone ↔ hane çevirisi — birim sözleşmesi
 
 EPDK "abone" sayar (= sayaç/sözleşme), biz "hane" üretiyoruz. Eşleme ısıtma tipine bağlı:
@@ -874,8 +919,8 @@ döner, her madde `OK` / `FARKLI` etiketiyle ayrı yazdırılır.
 | 9 | `gun_agirligi` her (il, ay) için toplamı **1,0 ± 1e-9** |
 | 10 | **IPF marjinal 1:** her il için yıllık toplam, EPDK il tüketimine **±%0,1** |
 | 11 | **IPF marjinal 2:** her ay için Marmara toplamı, GAZBİR aylığına **±%0,1** |
-| 12 | Gaz: Mevsimsel asimetri (Ocak toplamı / Ağustos toplamı) her il için ∈ [6, 14] — bant artık gerçek Marmara-geneli GAZBİR ölçümünü (12,47, madde 4) rahatça kapsıyor, proxy'den türetilmiş eski bandın (BOTAŞ KFU) tesadüfen doğru mertebede olduğu teyit edildi. **Katı yakıt: bu oran tanımsız (payda 0), yerine** Haziran–Ağustos toplamı tam 0; Aralık–Şubat toplamı yıllık toplamın %55–%75'i (Karar 5) |
-| 13 | `gunluk_hane_m3 > 0`, NaN/inf yok; makullük bandı 0,3 – 12 m³/gün (hane başı, `# VARSAYIM`) |
+| 12 | Gaz: Mevsimsel asimetri (Ocak toplamı / Ağustos toplamı) her il için ∈ **[6, 18]** (2026-08-25'te [6,14]'ten genişletildi — bkz. §4.3.2 "Mart anomalisi", faturalama-dönemi hipotezi test edilip REDDEDİLDİ, genişletme gerekçeli). Marmara-geneli GAZBİR ölçümü (12,47, madde 4a) bandın ortasında; il bazlı genlik Mart'ın gerçek yüksekliği yüzünden bunun üzerine çıkabiliyor (ölçülen: Bilecik 14,77, Edirne 16,57, Kırklareli 14,84, Tekirdağ 14,03 — hepsi yeni bandın içinde). **Katı yakıt: bu oran tanımsız (payda 0), yerine** Haziran–Ağustos toplamı tam 0; Aralık–Şubat toplamı yıllık toplamın %55–%75'i (Karar 5) |
+| 13 | `gunluk_hane_m3 > 0`, NaN/inf yok; makullük bandı 0,3 – **18** m³/gün (2026-08-25'te 12'den genişletildi — bkz. §4.3.2; hane başı, `# VARSAYIM`) |
 | 14 | **KOŞULLU (2026-08-25 netleştirildi) — Ölçek çapraz kontrolü:** Ocak `gunluk_hane_kwh × 31`, aynı ayın elektrik `ortalama_hane_kwh` toplamının 5–10 katı (§4.6). `calibration_electricity.parquet` Adım 2 branch'ine ait — bu branch'te bulunamazsa madde **ATLANDI** etiketiyle geçilir, başarısız SAYILMAZ; sebebi (dosya bulunamadı) yazdırılır |
 | ~~15~~ | **SİLİNDİ (2026-08-25).** Eski metin: "Abone tutarlılığı: §4.4 ile çözülen `penetrasyon(il)` ∈ [0,7 , 1,0]; bant dışı iller tek tek listeleniyor." Bu madde **uygulanamaz**: `penetrasyon(il)`'in paydası `abone_mesken(il)` hiçbir kaynakta bulunamadı — GAZBİR'in yıllık raporu yalnız taranmış (scanned) bir flip-book, OCR bilinçli olarak reddedildi (yönerge §0.1/Kapı 2). Yerine geçen kontroller zaten var ve hane havuzunu dış veriye karşı sınama amacını gerçekten yapılabilir biçimde karşılıyor: **madde 20** (abone testi, İstanbul), **madde 21** (dış uzlaşım, il bazlı), **madde 23** (İstanbul dış çapası) — madde 15 sessizce kaybolmuyor, yerini bu üçü dolduruyor |
 | 16 | `Σ kombi_hane` = **6.149.023**, `Σ soba_hane` = **486.046** — `households.parquet` ile tam eşitlik, tolerans yok (Karar 4'ün A/B revizyonu sonrası sayılar, 2026-08-21; ilk tur — A/B'siz — 6.396.834/296.564 vermişti, o da 4.401.560/660.949'un düzeltmesiydi) |
