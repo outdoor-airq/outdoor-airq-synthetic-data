@@ -83,6 +83,46 @@ Container `tail -f /dev/null` ile boşta bekler — image'ın `ENTRYPOINT`'i `py
 > Init'e ikinci bir kopya koymak iki ayrı DDL kaynağı yaratır (drift riski) ve `down -v` sonrası
 > yalnızca BOŞ bir tablo geri getirir — bu da "veri var" yanılgısına yol açar.
 
+## Adım 2 — EPİAŞ kalibrasyonu
+
+`households.parquet`'in tamamlanmasının ardından, elektrik tüketimi için 5 dağıtım bölgesi
+(BEDAŞ, AYEDAŞ, SEDAŞ, UEDAŞ, Trakya EDAŞ) × saat granülaritesinde bir hedef tablo üretir:
+`data/generated/calibration_electricity.parquet` — 12 aylık varsayılan pencerede 5 bölge ×
+aralıktaki saat sayısı satır (12 ayda ~43.800). Kaynak dokümanlar: `docs/prompts/adim-02-epias-kalibrasyon-prompt.md`
+ve `docs/prompts/adim-02-ek-not-granulerlik.md` (EPİAŞ'ta bölge×saat kesişimi veren bir uç
+olmadığı keşfi ve mimari kararlar).
+
+**Üç mod** (`EPIAS_MODE` ortam değişkeni):
+
+| Mod | Davranış |
+|---|---|
+| `live` (varsayılan) | EPİAŞ'a bağlanır, sıcak pencereyi (bu ay + geçen ay) çeker, cache'i günceller. `EPTR_USERNAME`/`EPTR_PASSWORD` gerekir. |
+| `cached` | Ağa hiç çıkmaz, yalnız `data/epias/` altındaki cache'i okur. Eksik dosya varsa hata. Kimlik bilgisi gerekmez. |
+| `synthetic` | EPİAŞ'a hiç bağlanmaz, kaba sabit bir tahmin kullanır (`# VARSAYIM`). Kimlik bilgisi gerekmez — EPİAŞ erişimi gecikirse pipeline'ın bloke olmaması için. |
+
+```bash
+docker run --rm -v synthetic_data_out:/data/generated -v $PWD/data/epias:/data/epias \
+  --network outdoor-airq-network \
+  -e EPTR_USERNAME=<kullanici> -e EPTR_PASSWORD=<sifre> \
+  -e DB_HOST=timescaledb -e DB_USER=<kullanici> -e DB_PASSWORD=<sifre> \
+  synthetic-data -m src.build_calibration --start-date 2025-08-01 --end-date 2026-08-01
+
+# Doğrulama: 16 maddelik kontrol
+docker run --rm -v synthetic_data_out:/data/generated -v $PWD/data/epias:/data/epias \
+  --network outdoor-airq-network \
+  -e DB_HOST=timescaledb -e DB_USER=<kullanici> -e DB_PASSWORD=<sifre> \
+  synthetic-data -m src.validate_calibration
+```
+
+`--force-refresh` bayrağı, sıcak/dondurulmuş pencere ayrımını bypass edip **tüm** cache'i
+yeniden çeker (elle tam yenileme için). Cache kalıcı olması için `data/epias/` volume'ünün
+mount edilmesi şart — aksi halde container her yeniden yaratıldığında (`down`, `up --build`)
+cache sıfırlanır ve dondurulmuş aylar bile yeniden çekilir.
+
+> **DB bağımlılığı sınırlı.** Adım 2, `households_marmara`'ya yalnızca bölge başına hane
+> sayısını almak için **salt okuma** bağlanır (`SELECT dagitim_sirketi, COUNT(*) ... GROUP BY 1`).
+> Hiçbir `INSERT`/`UPDATE`/`DDL` yok.
+
 ## Girdi verisi
 
 TÜİK dosyaları **repoda commit'li** (`data/tuik/`, ~7.6 MB) ve Docker image'ının içine gömülüyor.
