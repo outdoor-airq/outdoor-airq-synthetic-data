@@ -19,6 +19,15 @@ COPY data/tuik/ /data/tuik/
 # yolundan okuyor. ~1 KB, statik, versiyonlu (demandlib'den bir kerelik disa aktarim).
 COPY data/bdew/ /data/bdew/
 
+# Ayni gerekce, Adim 2b: build_gas_calibration.py / build_solid_fuel_calibration.py /
+# validate_heating_calibration.py bu ucunu /data/epdk|gazbir|igdas MUTLAK yolundan okur
+# (REPO_ROOT tanimli degilse). Kucuk, statik, versiyonlu girdiler; temiz klon testinde
+# (2026-08-26) bu COPY'lerin eksik oldugu ve build script'lerinin container'da
+# "dosya bulunamadi" ile durdugu bulundu.
+COPY data/epdk/ /data/epdk/
+COPY data/gazbir/ /data/gazbir/
+COPY data/igdas/ /data/igdas/
+
 ENV PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app
 

@@ -245,18 +245,33 @@ def build_gas_calibration(
 
 
 if __name__ == "__main__":
-    REPO = os.environ.get("REPO_ROOT", os.getcwd())
-    households_path = os.path.join(REPO, "data", "generated", "households.parquet")
-    epdk_tuketim_csv = os.path.join(REPO, "data", "epdk", "il_yillik_tuketim_2025.csv")
-    epdk_mesken_pay_csv = os.path.join(REPO, "data", "epdk", "il_mesken_pay_2022.csv")
-    igdas_ilce_csv = os.path.join(REPO, "data", "igdas", "ilce_kullanim_sinifi_2025.csv")
-    gazbir_csv = os.path.join(REPO, "data", "gazbir", "marmara_aylik_hane_m3.csv")
+    # REPO_ROOT yalnız yerel (Docker DIŞI) geliştirme için — verildiğinde tüm girdi/çıktı
+    # repo köküne göreli aranır. Verilmediğinde (gerçek konteyner ortamı) mutlak yollar
+    # kullanılır: data/generated bind-mount edilir, data/epdk|gazbir|igdas imaja gömülür
+    # (data/tuik, data/bdew ile AYNI gerekçe — Dockerfile'da COPY var). Bu ayrım
+    # olmadığında script'in kendisi çalışıyor görünüyordu ama container içinde
+    # `/app/data/generated/households.parquet` (yanlış) arıyordu — gerçek dosya
+    # `/data/generated/households.parquet`'te (2026-08-26, temiz klon testinde bulundu).
+    REPO = os.environ.get("REPO_ROOT")
+    if REPO:
+        households_path = os.path.join(REPO, "data", "generated", "households.parquet")
+        epdk_tuketim_csv = os.path.join(REPO, "data", "epdk", "il_yillik_tuketim_2025.csv")
+        epdk_mesken_pay_csv = os.path.join(REPO, "data", "epdk", "il_mesken_pay_2022.csv")
+        igdas_ilce_csv = os.path.join(REPO, "data", "igdas", "ilce_kullanim_sinifi_2025.csv")
+        gazbir_csv = os.path.join(REPO, "data", "gazbir", "marmara_aylik_hane_m3.csv")
+        out_path = os.path.join(REPO, "data", "generated", "calibration_gas.parquet")
+    else:
+        households_path = "/data/generated/households.parquet"
+        epdk_tuketim_csv = "/data/epdk/il_yillik_tuketim_2025.csv"
+        epdk_mesken_pay_csv = "/data/epdk/il_mesken_pay_2022.csv"
+        igdas_ilce_csv = "/data/igdas/ilce_kullanim_sinifi_2025.csv"
+        gazbir_csv = "/data/gazbir/marmara_aylik_hane_m3.csv"
+        out_path = "/data/generated/calibration_gas.parquet"
 
     sonuc, diag = build_gas_calibration(
         households_path, epdk_tuketim_csv, epdk_mesken_pay_csv, igdas_ilce_csv, gazbir_csv
     )
 
-    out_path = os.path.join(REPO, "data", "generated", "calibration_gas.parquet")
     pq.write_table(pa.Table.from_pandas(sonuc, preserve_index=False), out_path)
 
     print(f"Satır sayısı: {len(sonuc)} (beklenen 4.015 = 11 il × 365 gün)")
