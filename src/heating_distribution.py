@@ -24,6 +24,9 @@ ile anahtarlanır, `dagitim_sirketi` ile DEĞİL (§0.1'in üç farkından biri)
 İki biçim var — Adım 3'ün `household_distribution.py` deseniyle birebir aynı: tekil (canlı
 yayının ihtiyacı) ve `_bulk` (tek hane, ardışık N saat — örnek üretiminin ihtiyacı). İkisi
 birebir aynı sonucu vermeli.
+
+Payload alan eşlemesi (masterplan §10): çıktı kolonu `h_theta`, dondurulmuş Kafka
+payload'ında `shape_factor` olarak taşınır. Katı yakıtta karşılığı `hdd`'dir (Karar 3).
 """
 
 import numpy as np
@@ -33,6 +36,9 @@ from config.distribution import GAS_JITTER_KEY, SOLIDFUEL_JITTER_KEY, bulk_daily
 from config.distribution_heating import HOURLY_SOLIDFUEL_SHAPE, ISIL_DEGER
 from config.gas import HOURLY_GAS_SHAPE
 from src.heating_shape import h_theta_profile
+
+_GAS_SHAPE_ARR = np.asarray(HOURLY_GAS_SHAPE)
+_SOLIDFUEL_SHAPE_ARR = np.asarray(HOURLY_SOLIDFUEL_SHAPE)
 
 _PROFIL_BY_KONUT_TIPI = {"mustakil": "EFH", "apartman": "MFH"}
 
@@ -118,7 +124,7 @@ def distribute_gas_household_bulk(
     noise_applied = gun_katsayisi * saat_katsayisi
 
     hane_gun = np.asarray(gunluk_hane_m3, dtype=np.float64) * profil_duzeltmesi * base_multiplier * gun_katsayisi
-    saat_sekli = np.array([HOURLY_GAS_SHAPE[t.hour] for t in measured_at])
+    saat_sekli = _GAS_SHAPE_ARR[measured_at.hour.to_numpy()]
     consumption_m3 = hane_gun * saat_sekli * saat_katsayisi
 
     return pd.DataFrame({
@@ -214,7 +220,7 @@ def distribute_solidfuel_household_bulk(
     saat_katsayisi = bulk_hourly_jitter(household_id, hour_start, n, key=SOLIDFUEL_JITTER_KEY)
     noise_applied = np.where(isitma_var, gun_katsayisi * saat_katsayisi, 0.0)
 
-    saat_sekli = np.array([HOURLY_SOLIDFUEL_SHAPE[t.hour] for t in measured_at])
+    saat_sekli = _SOLIDFUEL_SHAPE_ARR[measured_at.hour.to_numpy()]
     hane_gun = np.asarray(gunluk_hane_kwh, dtype=np.float64) * base_multiplier * gun_katsayisi
     consumption_kwh = np.where(isitma_var, hane_gun * saat_sekli * saat_katsayisi, 0.0)
     consumption_kg = np.where(isitma_var, consumption_kwh / ISIL_DEGER[fuel_type], 0.0)
