@@ -7,6 +7,10 @@ venv/
 # data/tuik/ ise BILEREK commit'li: girdi kaynagi, uretimi tekrarlanabilir kiliyor.
 data/generated/
 
+# EPİAŞ ham yanıt cache'i (src/epias_cache.py). Uretim ciktisi gibi: repoya girmez,
+# gerektiginde EPIAS'tan yeniden cekilir.
+data/epias/
+
 .env
 .envrc.local
 
