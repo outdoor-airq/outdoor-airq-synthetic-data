@@ -36,3 +36,7 @@ KONUT_TIPI_DTYPE = pd.CategoricalDtype(categories=['apartman', 'mustakil'], orde
 ISITMA_TIPI_DTYPE = pd.CategoricalDtype(
     categories=['kombi', 'merkezi', 'soba', 'elektrikli'], ordered=False
 )
+
+# Adım 2b Karar 4/5 (2026-08-21): yalnız isitma_tipi=='soba' haneler için dolu, diğerlerinde
+# NULL (gaz/elektrik yakıt tipi değil). bkz. config/solid_fuel.py.
+FUEL_TYPE_DTYPE = pd.CategoricalDtype(categories=['komur', 'odun'], ordered=False)

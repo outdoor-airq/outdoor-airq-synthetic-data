@@ -1,0 +1,28 @@
+# Kaynak: EPDK 2022 Yili Dogal Gaz Piyasasi Sektor Raporu (DOCX), Tablo "Il/Sirket -
+#   Abone Sayisi* - Serbest Tuketici Sayisi*" (dokuman ici tablo index 40)
+# URL: https://www.epdk.gov.tr/Detay/Icerik/3-0-94-1007/dogal-gazyillik-sektor-raporu
+#   (indirme linki: https://www.epdk.gov.tr/Detay/DownloadDocument?id=J3PMRLrxosE= )
+# Cekilme tarihi: 2026-08-20
+#
+# ONEMLI SINIRLAMA: bu TUM MUSTERI TURLERININ (mesken+ticari+sanayi+...) toplam abone
+# sayisidir, MESKEN-OZEL DEGIL -- raporun hicbir yerinde il x mesken abone sayisi
+# kirilimi bulunamadi (bu Kapi'nin ana hedeflerinden biriydi, cozulemedi).
+#
+# NOT (dusuk guvenilirlikte bir isaret, VARSAYIM DEGIL): Istanbul icin bu tablonun
+# abone_sayisi degeri (5.374.050) Kapi 1'de (IGDAS 2025) bagimsiz olarak olculen
+# MESKEN sayac toplamina (5.374.593, farkli yil: 2025) sasirtici derecede yakin
+# (fark 543, %0.01) -- bu, buradaki "Abone Sayisi"nin fiilen mesken agirlikli
+# oldugunu dusundurebilir ama farkli yil + farkli olcum oldugu icin kanit degil,
+# yalniz bir gozlem.
+il_adi,abone_sayisi_TOPLAM_musteri_turu_2022,serbest_tuketici_sayisi_2022
+İstanbul,5374050,238998
+Kocaeli,675085,20456
+Sakarya,310015,10400
+Bursa,1029045,31569
+Balıkesir,254604,8515
+Çanakkale,127139,4745
+Yalova,123763,3559
+Tekirdağ,366375,11298
+Edirne,93761,4167
+Kırklareli,102481,3990
+Bilecik,67050,3479

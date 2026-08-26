@@ -13,6 +13,8 @@ services:
       # konteyner yeniden yaratıldığında kayboluyor ve dondurulmuş aylar her koşuda
       # yeniden çekiliyor — cache'in var oluş sebebi ortadan kalkıyor.
       - ./data/epias:/data/epias
+      # Adım 2b: Open-Meteo sıcaklık cache'i — aynı gerekçe.
+      - ./data/weather:/data/weather
     environment:
       DB_HOST: timescaledb
       DB_PORT: "5432"

@@ -11,6 +11,9 @@ data/generated/
 # gerektiginde EPIAS'tan yeniden cekilir.
 data/epias/
 
+# Adim 2b: Open-Meteo sicaklik cache'i, .env gibi yeniden uretilebilir/yerel veri.
+data/weather/
+
 .env
 .envrc.local
 
