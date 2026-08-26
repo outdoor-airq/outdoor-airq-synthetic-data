@@ -30,7 +30,8 @@ from config.solid_fuel import SOBA_YAKIT_ENERJI_ORANI
 from config.provinces import IL_KODU
 from config.gas import HEATING_LEVEL_SOURCE_DTYPE, HEATING_SHAPE_SOURCE_DTYPE, TEMP_SOURCE_DTYPE
 from src import weather_cache
-from src.build_gas_calibration import _kombi_hane_by_il, _kombi_tuketim_by_il, _merkezi_pay
+from src.build_gas_calibration import ISINMA_KUYRUK_BASLANGIC, _kombi_hane_by_il, _kombi_tuketim_by_il, _merkezi_pay
+from src.heating_shape import theta_ref as theta_ref_fn
 
 KALIBRASYON_YILI = 2025
 
@@ -53,15 +54,30 @@ def _soba_hane_ve_komur_orani(households_path: str):
 
 
 def _hdd_yillik_seri(il_kodu: int) -> pd.Series:
-    """2025 için günlük `T`, HDD eşiğiyle (`Tm > 15°C` ise 0). Gazın aksine ısınma payı
-    (3 gün öncesi) burada YOK — HDD aynı günün ortalama sıcaklığına dayanır, theta_ref
-    kullanılmaz (§4.5)."""
-    df = weather_cache.read_cached_only(
+    """2025 için günlük `T`, HDD eşiğiyle (`Tm > 15°C` ise 0) VE `theta_ref` (Adım 3b Karar 2,
+    2026-08-26 eklendi — `energy.solidfuel` payload sözleşmesi bunu bekliyor). HDD hâlâ AYNI
+    GÜNÜN ortalama sıcaklığına dayanır (gazın aksine ısınma payı YOK, §4.5 değişmedi) — yalnız
+    `theta_ref` kolonu için 2024 kuyruğu birleştirilip gazdaki ile AYNI 3 günlük ısınma payı
+    uygulanıyor."""
+    kuyruk = weather_cache.read_cached_only(
+        il_kodu, KALIBRASYON_YILI - 1, ISINMA_KUYRUK_BASLANGIC, date(KALIBRASYON_YILI - 1, 12, 31)
+    )
+    yil = weather_cache.read_cached_only(
         il_kodu, KALIBRASYON_YILI, date(KALIBRASYON_YILI, 1, 1), date(KALIBRASYON_YILI, 12, 31)
     )
-    df["tarih"] = pd.to_datetime(df["tarih"])
-    df = df.set_index("tarih").sort_index()
+    birlesik = pd.concat([kuyruk, yil], ignore_index=True).sort_values("tarih")
+    s = birlesik.set_index("tarih")["T"]
+    s.index = pd.to_datetime(s.index)
+    theta = theta_ref_fn(s)
+
+    df = pd.DataFrame({"T": s, "theta_ref": theta})
+    df = df[df.index.year == KALIBRASYON_YILI]
     assert len(df) == 365, f"il {il_kodu}: 2025 için {len(df)} gün, 365 bekleniyor"
+
+    jan1 = pd.Timestamp(f"{KALIBRASYON_YILI}-01-01")
+    assert not pd.isna(df.loc[jan1, "theta_ref"]), (
+        f"il {il_kodu}: theta_ref({jan1.date()}) NaN geldi — 2024 kuyruğu birleştirilmemiş"
+    )
 
     hdd = np.maximum(0.0, HDD_BASE_TEMP - df["T"])
     hdd = hdd.where(df["T"] <= HEATING_THRESHOLD, 0.0)
@@ -110,6 +126,7 @@ def build_solid_fuel_calibration(
                     "il_kodu": np.uint8(kod),
                     "il_adi": IL_KODU[kod],
                     "tarih": df.index.tz_localize("Europe/Istanbul"),
+                    "theta_ref": df["theta_ref"].astype("float32"),
                     "hdd": df["hdd"].astype("float32"),
                     "gun_agirligi": gun_agirligi.astype("float64"),
                     "soba_hane": np.uint32(soba_hane[kod]),

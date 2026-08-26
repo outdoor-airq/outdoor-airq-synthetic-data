@@ -973,11 +973,25 @@ hane yalnız ölçekliyordu. Gazda **şekil haneye göre değişir** — müstak
 apartmandan dik. Bölge günlük hedefi karışık profille (`(n_EFH·h_EFH + n_MFH·h_MFH) / n`)
 kurulduğu için, hane bazında kendi profiline geçilince toplam kayar.
 
-Bu, Adım 3'ün `düzeltme(bölge, ay) = 1 / (1 + AC_DELTA[ay] × w_bölge)` analitik telafisinin
-birebir muadilidir ve aynı şekilde **statik sabitlerle** çözülmelidir: müstakil payı
-(bölge bazında, Ek A.2 — **Karar 4 sonrası %10,3–%32,7**, eski %7,13–%13,28 değil)
-popülasyonun donmuş bir özelliğidir, koşu anında hesaplanmayacaktır. Canlı yayında
-`energy-publisher` bölge toplamını bilmek zorunda kalmaz.
+**Düzeltme — bu paragraf 2026-08-26'da yanlış çıktı, bkz. 3b yönergesi §1.1:** yukarıdaki
+"statik sabitlerle çözülmelidir" ifadesi hatalıydı. Adım 3'ün `düzeltme(bölge, ay)`'ının
+gerekmesinin sebebi, `ac_factor`'ün bölge ortalamasının 1,0 olmaması — orada gerçek bir
+sistematik sapma vardı. Burada öyle bir sapma **yok**: düzeltme yerel ve tanım gereği tamdır,
+statik bir sabit gerektirmez:
+
+```
+profil_düzeltmesi_i(gün) = h_profil(konut_tipi_i, θ_ref(il_i, gün)) / h_theta(il_i, gün)
+
+Σ_i h_profil_i = n_EFH·h_EFH + n_MFH·h_MFH = n · h_theta     (h_theta zaten bu karışım)
+⇒ Σ_i profil_düzeltmesi_i / n = 1                             (her (il, gün) için TAM)
+```
+
+Çünkü `h_theta` kalibrasyon satırında zaten `EFH_PAY`/`MFH_PAY` ile kurulmuş karışık bir
+değer (`build_gas_calibration.py`), profil düzeltmesinin haneler üzerindeki ortalaması
+onu birebir geri verir — bölgeye/ile özgü bir sabit hesaplamaya gerek kalmaz. Statik
+`MUSTAKIL_PAY_IL` (Ek A.2, Karar 4 sonrası %10,3–%32,7) yalnız **doğrulamada** (3b madde 12'nin
+beklenen değerini kurmak için) gerekli, dağıtımın kendisi için değil. Canlı yayında
+`energy-publisher` yine bölge/il toplamını bilmek zorunda kalmaz.
 
 ---
 

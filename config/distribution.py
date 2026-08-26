@@ -35,6 +35,16 @@ SEED = 20260818
 HOURLY_JITTER_KEY = SEED
 DAILY_DRIFT_KEY = SEED ^ 0x44524946545F4B45  # sabit karışım, "DRIFT_KE" ascii'sinden
 
+# Adım 3b Karar 1 (2026-08-26, bkz. adim-03b-gaz-kati-yakit-dagitim-yonergesi.md §2):
+# emtialar arası gürültü ilişkisi. DAILY_DRIFT_KEY ÜÇ emtia arasında PAYLAŞILIR (yukarıdaki
+# sabit, DEĞİŞMEDİ) — günlük kayma hanenin doluluk/davranış durumudur, ortak. Saatlik jitter
+# ise EMTİAYA ÖZEL — cihaz düzeyi rastgelelik (kombi çevrimi ile buzdolabı çevrimi
+# ilişkisizdir). HOURLY_JITTER_KEY elektriğe ait, DEĞİŞMEDİ; gaz ve katı yakıt için yeni,
+# AYRI anahtarlar ekleniyor — üçü de birbirinden bağımsız, hiçbiri (household, zaman_indeksi)
+# çiftinde çakışmıyor.
+GAS_JITTER_KEY = SEED ^ 0x4741535F4A495454        # "GAS_JITT"
+SOLIDFUEL_JITTER_KEY = SEED ^ 0x534F4C49445F4A49  # "SOLID_JI"
+
 
 def hour_index(t) -> int:
     """Mutlak saat indeksi — EPOCH'tan bu yana geçen tam saat sayısı."""
