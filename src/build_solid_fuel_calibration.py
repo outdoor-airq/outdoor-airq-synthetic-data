@@ -148,17 +148,26 @@ def build_solid_fuel_calibration(
 
 
 if __name__ == "__main__":
-    REPO = os.environ.get("REPO_ROOT", os.getcwd())
-    households_path = os.path.join(REPO, "data", "generated", "households.parquet")
-    epdk_tuketim_csv = os.path.join(REPO, "data", "epdk", "il_yillik_tuketim_2025.csv")
-    epdk_mesken_pay_csv = os.path.join(REPO, "data", "epdk", "il_mesken_pay_2022.csv")
-    igdas_ilce_csv = os.path.join(REPO, "data", "igdas", "ilce_kullanim_sinifi_2025.csv")
+    # REPO_ROOT yalnız yerel (Docker DIŞI) geliştirme için — bkz. build_gas_calibration.py
+    # aynı bloktaki gerekçe (2026-08-26, temiz klon testinde bulunan hata).
+    REPO = os.environ.get("REPO_ROOT")
+    if REPO:
+        households_path = os.path.join(REPO, "data", "generated", "households.parquet")
+        epdk_tuketim_csv = os.path.join(REPO, "data", "epdk", "il_yillik_tuketim_2025.csv")
+        epdk_mesken_pay_csv = os.path.join(REPO, "data", "epdk", "il_mesken_pay_2022.csv")
+        igdas_ilce_csv = os.path.join(REPO, "data", "igdas", "ilce_kullanim_sinifi_2025.csv")
+        out_path = os.path.join(REPO, "data", "generated", "calibration_solid_fuel.parquet")
+    else:
+        households_path = "/data/generated/households.parquet"
+        epdk_tuketim_csv = "/data/epdk/il_yillik_tuketim_2025.csv"
+        epdk_mesken_pay_csv = "/data/epdk/il_mesken_pay_2022.csv"
+        igdas_ilce_csv = "/data/igdas/ilce_kullanim_sinifi_2025.csv"
+        out_path = "/data/generated/calibration_solid_fuel.parquet"
 
     sonuc, diag = build_solid_fuel_calibration(
         households_path, epdk_tuketim_csv, epdk_mesken_pay_csv, igdas_ilce_csv
     )
 
-    out_path = os.path.join(REPO, "data", "generated", "calibration_solid_fuel.parquet")
     pq.write_table(pa.Table.from_pandas(sonuc, preserve_index=False), out_path)
 
     print(f"Satır sayısı: {len(sonuc)} (beklenen 4.015 = 11 il × 365 gün)")

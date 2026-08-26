@@ -491,15 +491,27 @@ def validate_all(gas_df, solid_df, households, epdk_tuketim_csv, epdk_mesken_pay
 
 
 if __name__ == "__main__":
-    REPO = os.environ.get("REPO_ROOT", os.getcwd())
-    households_path = os.path.join(REPO, "data", "generated", "households.parquet")
-    gas_path = os.path.join(REPO, "data", "generated", "calibration_gas.parquet")
-    solid_path = os.path.join(REPO, "data", "generated", "calibration_solid_fuel.parquet")
-    elektrik_path = os.path.join(REPO, "data", "generated", "calibration_electricity.parquet")
-    epdk_tuketim_csv = os.path.join(REPO, "data", "epdk", "il_yillik_tuketim_2025.csv")
-    epdk_mesken_pay_csv = os.path.join(REPO, "data", "epdk", "il_mesken_pay_2022.csv")
-    igdas_ilce_csv = os.path.join(REPO, "data", "igdas", "ilce_kullanim_sinifi_2025.csv")
-    gazbir_csv = os.path.join(REPO, "data", "gazbir", "marmara_aylik_hane_m3.csv")
+    # REPO_ROOT yalnız yerel (Docker DIŞI) geliştirme için — bkz. build_gas_calibration.py
+    # aynı bloktaki gerekçe (2026-08-26, temiz klon testinde bulunan hata).
+    REPO = os.environ.get("REPO_ROOT")
+    if REPO:
+        households_path = os.path.join(REPO, "data", "generated", "households.parquet")
+        gas_path = os.path.join(REPO, "data", "generated", "calibration_gas.parquet")
+        solid_path = os.path.join(REPO, "data", "generated", "calibration_solid_fuel.parquet")
+        elektrik_path = os.path.join(REPO, "data", "generated", "calibration_electricity.parquet")
+        epdk_tuketim_csv = os.path.join(REPO, "data", "epdk", "il_yillik_tuketim_2025.csv")
+        epdk_mesken_pay_csv = os.path.join(REPO, "data", "epdk", "il_mesken_pay_2022.csv")
+        igdas_ilce_csv = os.path.join(REPO, "data", "igdas", "ilce_kullanim_sinifi_2025.csv")
+        gazbir_csv = os.path.join(REPO, "data", "gazbir", "marmara_aylik_hane_m3.csv")
+    else:
+        households_path = "/data/generated/households.parquet"
+        gas_path = "/data/generated/calibration_gas.parquet"
+        solid_path = "/data/generated/calibration_solid_fuel.parquet"
+        elektrik_path = "/data/generated/calibration_electricity.parquet"
+        epdk_tuketim_csv = "/data/epdk/il_yillik_tuketim_2025.csv"
+        epdk_mesken_pay_csv = "/data/epdk/il_mesken_pay_2022.csv"
+        igdas_ilce_csv = "/data/igdas/ilce_kullanim_sinifi_2025.csv"
+        gazbir_csv = "/data/gazbir/marmara_aylik_hane_m3.csv"
 
     gas_df = pq.read_table(gas_path).to_pandas()
     solid_df = pq.read_table(solid_path).to_pandas()
