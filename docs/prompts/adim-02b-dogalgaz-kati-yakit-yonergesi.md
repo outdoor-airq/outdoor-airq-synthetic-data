@@ -989,9 +989,14 @@ profil_düzeltmesi_i(gün) = h_profil(konut_tipi_i, θ_ref(il_i, gün)) / h_thet
 Çünkü `h_theta` kalibrasyon satırında zaten `EFH_PAY`/`MFH_PAY` ile kurulmuş karışık bir
 değer (`build_gas_calibration.py`), profil düzeltmesinin haneler üzerindeki ortalaması
 onu birebir geri verir — bölgeye/ile özgü bir sabit hesaplamaya gerek kalmaz. Statik
-`MUSTAKIL_PAY_IL` (Ek A.2, Karar 4 sonrası %10,3–%32,7) yalnız **doğrulamada** (3b madde 12'nin
-beklenen değerini kurmak için) gerekli, dağıtımın kendisi için değil. Canlı yayında
-`energy-publisher` yine bölge/il toplamını bilmek zorunda kalmaz.
+`MUSTAKIL_PAY_IL` yalnız **doğrulamada** (3b madde 12'nin beklenen değerini kurmak için)
+gerekli, dağıtımın kendisi için değil. **Düzeltme (2026-08-26):** Ek A.2 tablosu **bölge**
+bazındadır (%9,71–%14,38, elektrik dağıtım bölgesi kırılımı) — ama gaz **il** bazlı
+anahtarlanıyor (Karar 1), bölge değil. `MUSTAKIL_PAY_IL`, `households.parquet`'ten **il**
+bazında ölçüldü (kombi havuzu içinde müstakil oranı): **%9,64 (Bursa) – %19,69 (Çanakkale)**
+arası — önceki turda burada yanlışlıkla yazılan "%10,3–%32,7" bölge tablosuna dayanmıyordu,
+doğrulanmamış bir sayıydı, silindi. Canlı yayında `energy-publisher` yine il toplamını
+bilmek zorunda kalmaz.
 
 ---
 
