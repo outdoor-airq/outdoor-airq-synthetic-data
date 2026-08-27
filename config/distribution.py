@@ -35,6 +35,16 @@ SEED = 20260818
 HOURLY_JITTER_KEY = SEED
 DAILY_DRIFT_KEY = SEED ^ 0x44524946545F4B45  # sabit karışım, "DRIFT_KE" ascii'sinden
 
+# Adım 3b Karar 1 (2026-08-26, bkz. adim-03b-gaz-kati-yakit-dagitim-yonergesi.md §2):
+# emtialar arası gürültü ilişkisi. DAILY_DRIFT_KEY ÜÇ emtia arasında PAYLAŞILIR (yukarıdaki
+# sabit, DEĞİŞMEDİ) — günlük kayma hanenin doluluk/davranış durumudur, ortak. Saatlik jitter
+# ise EMTİAYA ÖZEL — cihaz düzeyi rastgelelik (kombi çevrimi ile buzdolabı çevrimi
+# ilişkisizdir). HOURLY_JITTER_KEY elektriğe ait, DEĞİŞMEDİ; gaz ve katı yakıt için yeni,
+# AYRI anahtarlar ekleniyor — üçü de birbirinden bağımsız, hiçbiri (household, zaman_indeksi)
+# çiftinde çakışmıyor.
+GAS_JITTER_KEY = SEED ^ 0x4741535F4A495454        # "GAS_JITT"
+SOLIDFUEL_JITTER_KEY = SEED ^ 0x534F4C49445F4A49  # "SOLID_JI"
+
 
 def hour_index(t) -> int:
     """Mutlak saat indeksi — EPOCH'tan bu yana geçen tam saat sayısı."""
@@ -116,9 +126,13 @@ def _words_to_lognormal(words: np.ndarray, sigma: float) -> np.ndarray:
     return np.exp(-0.5 * sigma**2 + sigma * z)
 
 
-def hourly_jitter(household_id: str, t) -> float:
-    """Saatlik jitter — bkz. §1.4. Tek bir (hane, saat) için."""
-    word = _addressable_raw_word(HOURLY_JITTER_KEY, household_no(household_id), hour_index(t))
+def hourly_jitter(household_id: str, t, key: int = HOURLY_JITTER_KEY) -> float:
+    """Saatlik jitter — bkz. §1.4. Tek bir (hane, saat) için.
+
+    `key`: Adım 3b Karar 1 (2026-08-26) — emtiaya özel anahtar (`GAS_JITTER_KEY`,
+    `SOLIDFUEL_JITTER_KEY`) geçirilebilir; varsayılan `HOURLY_JITTER_KEY` elektriğin mevcut
+    çağrılarını bit-bit değiştirmeden korur."""
+    word = _addressable_raw_word(key, household_no(household_id), hour_index(t))
     return float(_words_to_lognormal(np.array([word]), HOURLY_JITTER_SIGMA)[0])
 
 
@@ -134,10 +148,12 @@ def noise(household_id: str, t) -> float:
     return hourly_jitter(household_id, t) * daily_drift(household_id, t)
 
 
-def bulk_hourly_jitter(household_id: str, hour_start: int, n: int) -> np.ndarray:
+def bulk_hourly_jitter(household_id: str, hour_start: int, n: int, key: int = HOURLY_JITTER_KEY) -> np.ndarray:
     """Bir hane için ardışık `n` saatin saatlik jitter'ı — `hourly_jitter`'ı tek tek
-    çağırmakla birebir aynı sonucu verir, vektörel/hızlı (bkz. modül docstring'i)."""
-    words = _addressable_raw_words_bulk(HOURLY_JITTER_KEY, household_no(household_id), hour_start, n)
+    çağırmakla birebir aynı sonucu verir, vektörel/hızlı (bkz. modül docstring'i).
+
+    `key`: bkz. `hourly_jitter`'ın açıklaması — Adım 3b'nin emtiaya özel anahtarları için."""
+    words = _addressable_raw_words_bulk(key, household_no(household_id), hour_start, n)
     return _words_to_lognormal(words, HOURLY_JITTER_SIGMA)
 
 

@@ -509,6 +509,12 @@ Dört kural:
    kodla işler ve §9'un "Katman 2 verinin ne olduğunu bilmez" ilkesi korunur.
 4. `energy.gas` ve `energy.solidfuel` hane kümeleri v1'de ayrıktır (kombi ∩ soba = ∅). Bir
    hane iki topic'e birden yazmaz.
+5. **Katı yakıtta `shape_factor = hdd`** (Adım 3b Karar 3, 2026-08-26) — gazdaki `h(θ)`'nin
+   aksine yazın TAM 0 olur. **`shape_factor == 0` (yani `hdd == 0`) olduğunda katı yakıt
+   anomali değerlendirmesi ATLANIR** — `consumption/shape_factor` `0/0`'a düşmez, tüketicide
+   bir taban değer (`max(hdd, 1)` gibi) uydurulmaz. Gerekçe: HDD sıfırken tüm popülasyonun
+   tüketimi gerçekten sıfırdır — tespit edilecek bir şey yoktur; taban değer olmayan bir
+   sinyali varmış gibi gösterir.
 
 ---
 

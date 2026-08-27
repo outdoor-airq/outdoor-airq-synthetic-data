@@ -22,8 +22,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from config.gas import (
-    EFH_PAY,
-    MFH_PAY,
+    EFH_PAY_IL,
     GAZ_DAGITIM_MAP,
     GAZ_DAGITIM_SIRKETI_DTYPE,
     HEATING_LEVEL_SOURCE_DTYPE,
@@ -102,7 +101,11 @@ def _theta_ve_h_2025(il_kodu: int) -> pd.DataFrame:
     """2024 kuyruğu (28-31 Aralık) + 2025 tam yılı birleştirip `theta_ref`'e verir, sonra
     2025 DIŞINDAKİ günleri atar. Sıcaklık birleştirme bu fonksiyonun sorumluluğudur (yönerge
     notu, 2026-08-25) — birleştirme yapılmazsa `theta_ref(2025-01-01)` NaN gelir, bu KASITLI
-    davranış aşağıdaki assert ile açıkça yakalanır (sessizce yanlış hesaplamak yerine)."""
+    davranış aşağıdaki assert ile açıkça yakalanır (sessizce yanlış hesaplamak yerine).
+
+    `h_theta`, bu ilin GERÇEK müstakil payıyla (`EFH_PAY_IL[il_kodu]`) karışık kurulur —
+    Adım 3b madde 12 kök neden düzeltmesi (2026-08-27, bkz. `config/gas.py::EFH_PAY_IL`).
+    Eskiden tüm iller için aynı global `EFH_PAY` kullanılıyordu."""
     kuyruk = weather_cache.read_cached_only(
         il_kodu, KALIBRASYON_YILI - 1, ISINMA_KUYRUK_BASLANGIC, date(KALIBRASYON_YILI - 1, 12, 31)
     )
@@ -114,7 +117,7 @@ def _theta_ve_h_2025(il_kodu: int) -> pd.DataFrame:
     s.index = pd.to_datetime(s.index)
 
     theta = theta_ref_fn(s)
-    h = h_theta_mix(theta)
+    h = h_theta_mix(theta, EFH_PAY_IL[il_kodu])
 
     df = pd.DataFrame({"T": s, "theta_ref": theta, "h_theta": h})
     df = df[df.index.year == KALIBRASYON_YILI]

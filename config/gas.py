@@ -9,6 +9,7 @@ seviye katmanında, §4.3, burada değil).
 
 import os
 
+import numpy as np
 import pandas as pd
 
 # --- Gaz dağıtım şirketi haritası -------------------------------------------------
@@ -135,6 +136,33 @@ EFH_PAY = 0.1068   # müstakil (Einfamilienhaus)
 MFH_PAY = 0.8932   # apartman (Mehrfamilienhaus)
 assert abs(EFH_PAY + MFH_PAY - 1.0) < 1e-9, "EFH_PAY + MFH_PAY toplamı 1 değil"
 
+# Adım 3b — madde 12 kök neden düzeltmesi (2026-08-27): yukarıdaki EFH_PAY/MFH_PAY Marmara
+# GENELİ tek bir sabit — `h_theta_mix`'in bunlarla kurduğu karışım her il için AYNI. Ama
+# gerçek müstakil oranı ile göre %9,64 (Bursa) ile %19,69 (Çanakkale) arasında değişiyor;
+# bu yüzden `Σ_i profil_düzeltmesi_i/n = 1` özdeşliği (adim-03b-...yonergesi.md §1.1) yalnız
+# global orana yakın illerde (İstanbul/Kocaeli/Bursa) tutuyor, uzak illerde (Çanakkale,
+# Kırklareli) ±%2'ye varan sistematik sapma veriyordu (doğrulama madde 12'de yakalandı).
+# `households.parquet`'ten (salt okuma) BİR KEZ ölçüldü — kombi havuzu içinde
+# konut_tipi=='mustakil' oranı, il bazında (2026-08-27). Popülasyon deterministik/donmuş
+# olduğu için koşu anında yeniden hesaplanmaz (Adım 3'ün `W_BOLGE` deseniyle aynı gerekçe).
+# Yukarıdaki GLOBAL EFH_PAY/MFH_PAY SİLİNMEDİ — Faz 2 spike testinde ve `isaret_testi()`'nde
+# kullanılıyor, oraya dokunulmadı.
+EFH_PAY_IL = {
+    10: 0.170803,  # Balıkesir
+    11: 0.140164,  # Bilecik
+    16: 0.096422,  # Bursa
+    17: 0.196925,  # Çanakkale
+    22: 0.162437,  # Edirne
+    34: 0.097862,  # İstanbul
+    39: 0.195252,  # Kırklareli
+    41: 0.102633,  # Kocaeli
+    54: 0.179805,  # Sakarya
+    59: 0.118357,  # Tekirdağ
+    77: 0.143420,  # Yalova
+}
+assert len(EFH_PAY_IL) == 11, f"EFH_PAY_IL 11 il yerine {len(EFH_PAY_IL)} il içeriyor"
+assert all(0.0 < v < 1.0 for v in EFH_PAY_IL.values()), "EFH_PAY_IL [0,1] dışında"
+
 
 # --- Sıcaklık ağırlıklandırma — BDEW termal atalet modeli -------------------------
 # theta_ref(d) = (T_d + 0.5*T_{d-1} + 0.25*T_{d-2} + 0.125*T_{d-3}) / 1.875
@@ -249,14 +277,23 @@ ISTANBUL_KOMBI_KONUT_BIRIMI_IGDAS = 4_436_039  # İGDAŞ sayım — MERKEZ içer
                                                  # sınıflarının sayaç toplamı (Karar 4), madde 23'ün çapası
 
 
-# --- Saatlik gaz şekli — TANIMLANIR AMA TÜKETİLMEZ ---------------------------------
-# Karar 2 (yönerge §2): saatlik dağılım bu adımda ÜRETİLMEZ, Adım 3b'de yayın anında
-# uygulanır. Burada yalnızca sözleşme yer tutucusu — Adım 2'nin AC_SEASONAL_DELTA_BY_MONTH
-# deseniyle aynı: gerçek değerler resmi bir saatlik gaz dağıtım katsayısı bulunamadığı
-# için düz (uniform) konuldu, bu haliyle KULLANILMAYACAK kadar kaba bir varsayımdır.
-# Adım 3b bunu kendi kalibrasyonuyla (varsa dağıtım şirketi SCADA verisi) değiştirmeden
-# yayına sokmayacak.
-HOURLY_GAS_SHAPE = tuple(1.0 / 24 for _ in range(24))  # VARSAYIM — yer tutucu, tüketilmiyor
+# --- Saatlik gaz şekli — gerçek eğriyle DEĞİŞTİRİLDİ (Adım 3b, 2026-08-26) ---------
+# §0.2'nin istisnası: config/gas.py'nin geri kalanı Adım 3b'de değiştirilemez, yalnız bu
+# sabit için "ek yapılabilir" denmişti. Resmi bir saatlik gaz dağıtım katsayısı hâlâ yok
+# (`# VARSAYIM`) — ama artık düz (uniform) değil, kombinin fiziksel davranışını (termostat
+# sürücülü, modülasyonlu/yumuşak) yansıtan bir eğri: gece setback (00-05, ortalamanın
+# ~%55-65'i), sabah rampası (06-08, termostat gece düşürülen hedefe geri ısıtır, tepe 08'de),
+# gündüz platosu (09-17, düz bakım ısıtması), akşam ikinci yükseliş (18-21, konfor sıcaklığı,
+# tepe 19'da, sabahtan biraz yüksek). Tepe/ortalama oranı ~1,53× — HOURLY_SOLIDFUEL_SHAPE'ten
+# (config/distribution_heating.py, ~2,5-3,0×) KASITLI olarak daha yumuşak, aynı eğri
+# kullanılmıyor (soba elle yakılır, kombi termostatla). Gün içinde toplamı tam 1.
+_HAM_HOURLY_GAS_SHAPE = np.array([
+    0.65, 0.60, 0.55, 0.55, 0.60, 0.75,  # 00-05: gece setback
+    1.10, 1.55, 1.45, 1.15, 1.00, 0.95,  # 06-11: sabah rampası ve düşüş
+    0.95, 0.95, 0.95, 1.00, 1.05, 1.15,  # 12-17: gündüz platosu
+    1.35, 1.50, 1.45, 1.25, 1.00, 0.80,  # 18-23: akşam ikinci yükseliş
+])
+HOURLY_GAS_SHAPE = tuple(_HAM_HOURLY_GAS_SHAPE / _HAM_HOURLY_GAS_SHAPE.sum())
 assert abs(sum(HOURLY_GAS_SHAPE) - 1.0) < 1e-9
 
 
