@@ -1,0 +1,40 @@
+name: Test (synthetic-data)
+
+# Ayrı, bağımsız bir hat — build-push-ghcr.yml'e (dağıtım hattı) BİLEREK dokunulmadı.
+# İkisini birleştirmek deploy'u teste bağımlı yapar ve o dosyanın paths: filtresi zaten
+# yalnız main'e push'u hedefliyor; test HER branch/PR'da koşmalı.
+on:
+  pull_request: {}
+  push: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: İmajı derle (push yok, yalnız CI önbelleği)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          push: false
+          load: true
+          tags: synthetic-data-test:${{ github.sha }}
+          cache-from: type=gha,scope=synthetic-data
+          cache-to: type=gha,scope=synthetic-data,mode=max
+
+      # DB/parquet gerektiren validate_*.py script'leri BİLEREK koşulmuyor — CI'da
+      # ne DB var ne üretilmiş veri. Yalnız DB/dosya bağımlılığı olmayan pytest testleri
+      # (şu an: §4.2 altın dosya sözleşmesi) koşar. Kapsam genişlerse ayrı bir iş.
+      - name: pytest (konteyner içinde)
+        run: docker run --rm synthetic-data-test:${{ github.sha }} -m pytest tests/ -v

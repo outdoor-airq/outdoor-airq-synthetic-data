@@ -30,7 +30,8 @@ COPY data/igdas/ /data/igdas/
 
 # Adim 4: src/payload.py altin dosya testi icin tests/golden/'i mutlak DEGIL, /app'e
 # GORELI (Path(__file__)'e gore) okuyor; ayni gerekce - kucuk, statik, versiyonlu.
-COPY tests/golden/ ./tests/golden/
+# tests/ butunu kopyalanir ki pytest de (tests/test_*.py) CI'da konteyner icinde kosabilsin.
+COPY tests/ ./tests/
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app
