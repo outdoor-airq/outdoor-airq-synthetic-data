@@ -25,8 +25,14 @@ ile anahtarlanır, `dagitim_sirketi` ile DEĞİL (§0.1'in üç farkından biri)
 yayının ihtiyacı) ve `_bulk` (tek hane, ardışık N saat — örnek üretiminin ihtiyacı). İkisi
 birebir aynı sonucu vermeli.
 
-Payload alan eşlemesi (masterplan §10): çıktı kolonu `h_theta`, dondurulmuş Kafka
-payload'ında `shape_factor` olarak taşınır. Katı yakıtta karşılığı `hdd`'dir (Karar 3).
+Payload alan eşlemesi (masterplan §10, 2026-08-27 düzeltmesi — madde 12 kök neden
+bulgusuyla birlikte): çıktı kolonu `h_profil` (hanenin KENDİ profiliyle hesaplanan h(θ)
+değeri), dondurulmuş Kafka payload'ında `shape_factor` olarak taşınır — `h_theta` (il
+karışımı) DEĞİL. Gerekçe: `AnomalyDetector`'ın `tüketim/shape_factor` normalizasyonu
+hane bazlı çalışıyor; bölen il karışımı olursa müstakil bir hane için oran sıcaklıkla
+hâlâ değişir (yalnız o hanenin kendi profiliyle bölünürse sabitlenir). `h_theta`
+çıktıda izlenebilirlik için AYRICA duruyor. Katı yakıtta şekil-faktör karşılığı
+`hdd`'dir (Karar 3) — profil ayrımı olmadığından bu sorun orada yok.
 """
 
 import numpy as np
@@ -78,6 +84,7 @@ def distribute_gas_household(
         base_multiplier=base_multiplier,
         theta_ref=theta_ref,
         h_theta=h_theta,
+        h_profil=h_profil,
         profil_duzeltmesi=profil_duzeltmesi,
         noise_applied=noise_applied,
         level_source=level_source,
@@ -136,6 +143,7 @@ def distribute_gas_household_bulk(
         "base_multiplier": np.float32(base_multiplier),
         "theta_ref": theta_ref_arr.astype("float32"),
         "h_theta": h_theta_arr.astype("float32"),
+        "h_profil": np.asarray(h_profil, dtype=np.float32),
         "profil_duzeltmesi": profil_duzeltmesi.astype("float32"),
         "noise_applied": noise_applied.astype("float32"),
         "level_source": level_source,
@@ -153,12 +161,16 @@ def distribute_solidfuel_household(
     measured_at: pd.Timestamp,
     gunluk_hane_kwh: float,
     hdd: float,
+    theta_ref: float,
     level_source: str,
     shape_source: str,
     temp_source: str,
 ) -> dict:
     """Tek bir (hane, saat) için katı yakıt Hane_i(saat). `hdd == 0` olan gün için tüketim
-    TAM 0.0 yazılır (Karar 3) — noise ile çarpılmaz, kg kolonu da 0.0 olur."""
+    TAM 0.0 yazılır (Karar 3) — noise ile çarpılmaz, kg kolonu da 0.0 olur.
+
+    `theta_ref`: hesaba GİRMEZ (katı yakıtta profil düzeltmesi yok, §1.2) — yalnız
+    `energy.solidfuel` payload sözleşmesi için taşınan bir izlenebilirlik alanı (Karar 2)."""
     if hdd == 0.0:
         consumption_kwh = 0.0
         consumption_kg = 0.0
@@ -181,6 +193,7 @@ def distribute_solidfuel_household(
         fuel_type=fuel_type,
         base_multiplier=base_multiplier,
         hdd=hdd,
+        theta_ref=theta_ref,
         noise_applied=noise_applied,
         level_source=level_source,
         shape_source=shape_source,
@@ -197,6 +210,7 @@ def distribute_solidfuel_household_bulk(
     measured_at: pd.DatetimeIndex,
     gunluk_hane_kwh: np.ndarray,
     hdd: np.ndarray,
+    theta_ref: np.ndarray,
     level_source: str,
     shape_source: str,
     temp_source: str,
@@ -204,14 +218,15 @@ def distribute_solidfuel_household_bulk(
 ) -> pd.DataFrame:
     """`distribute_solidfuel_household`'ın vektörel eşdeğeri — TEK hane için ardışık N saat.
 
-    `gunluk_hane_kwh`/`hdd`, `measured_at` ile aynı uzunlukta (günlük değerler saat içinde
-    tekrarlanmış). `hdd == 0` olan saatlerde tüketim TAM 0.0 (Karar 3) — bu saatler için
-    gürültü hiç hesaplanmaz, kalan saatler için normal şekilde hesaplanır."""
+    `gunluk_hane_kwh`/`hdd`/`theta_ref`, `measured_at` ile aynı uzunlukta (günlük değerler
+    saat içinde tekrarlanmış). `hdd == 0` olan saatlerde tüketim TAM 0.0 (Karar 3) — bu
+    saatler için gürültü hiç hesaplanmaz, kalan saatler için normal şekilde hesaplanır.
+    `theta_ref` hesaba girmez, yalnız payload izlenebilirliği için taşınır."""
     n = len(measured_at)
     if n == 0:
         raise ValueError("measured_at boş")
-    if not (len(gunluk_hane_kwh) == len(hdd) == n):
-        raise ValueError("gunluk_hane_kwh/hdd, measured_at ile aynı uzunlukta olmalı")
+    if not (len(gunluk_hane_kwh) == len(hdd) == len(theta_ref) == n):
+        raise ValueError("gunluk_hane_kwh/hdd/theta_ref, measured_at ile aynı uzunlukta olmalı")
 
     hdd_arr = np.asarray(hdd, dtype=np.float64)
     isitma_var = hdd_arr != 0.0
@@ -234,6 +249,7 @@ def distribute_solidfuel_household_bulk(
         "fuel_type": fuel_type,
         "base_multiplier": np.float32(base_multiplier),
         "hdd": hdd_arr.astype("float32"),
+        "theta_ref": np.asarray(theta_ref, dtype=np.float32),
         "noise_applied": noise_applied.astype("float32"),
         "level_source": level_source,
         "shape_source": shape_source,

@@ -17,7 +17,6 @@ from config.gas import (
     GEOMETRIC_TEMP_DIVISOR,
     GEOMETRIC_TEMP_WEIGHTS,
     HDD_BASE_TEMP,
-    MFH_PAY,
     WIND_CLASS,
 )
 
@@ -79,12 +78,17 @@ def h_theta_profile(theta, shlp_type: str):
     return a / (1 + (b / (theta - BDEW_THETA0)) ** c) + d
 
 
-def h_theta_mix(theta):
-    """Marmara ortalama konut tipi karışımıyla (`EFH_PAY`/`MFH_PAY`) ağırlıklı h(theta).
-    Bölgesel müstakil payı kırılımı (yönerge Ek A.2) kasıtlı olarak kullanılmıyor — bkz.
-    §4.2.2 (bölgesel ayrıma geçmek elle kurulmuş bantlara fit etmek olurdu, reddedildi).
-    """
-    return EFH_PAY * h_theta_profile(theta, "EFH") + MFH_PAY * h_theta_profile(theta, "MFH")
+def h_theta_mix(theta, efh_pay: float = EFH_PAY):
+    """Konut tipi karışımıyla ağırlıklı h(theta).
+
+    `efh_pay`: VARSAYILAN `EFH_PAY` (Marmara geneli, GERİYE UYUMLU — `isaret_testi()` ve
+    Faz 2 spike testi bunu değiştirmeden çağırıyor). Adım 3b madde 12 kök neden düzeltmesi
+    (2026-08-27, bkz. `config/gas.py::EFH_PAY_IL`): `build_gas_calibration.py` artık
+    il-özel `EFH_PAY_IL[il_kodu]` GEÇİRİYOR — gerçek müstakil payı ile göre değiştiği için
+    (Bursa %9,64 – Çanakkale %19,69), tek bir global oranla karışım kurmak
+    `Σ_i profil_düzeltmesi_i/n = 1` özdeşliğini (yönerge §1.1) yalnız global orana yakın
+    illerde sağlıyordu."""
+    return efh_pay * h_theta_profile(theta, "EFH") + (1 - efh_pay) * h_theta_profile(theta, "MFH")
 
 
 def hdd(gunluk_ortalama_sicaklik):

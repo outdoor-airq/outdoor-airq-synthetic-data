@@ -226,7 +226,8 @@ sigmoid uygulaması yazmaz.
 | `konut_tipi` | category | izlenebilirlik |
 | `base_multiplier` | float32 | izlenebilirlik |
 | `theta_ref` | float32 | payload'a taşınacak |
-| `shape_factor` | float32 | = `h_theta`, payload'a taşınacak |
+| `shape_factor` | float32 | = `h_profil` (hanenin KENDİ profiliyle h(θ)), payload'a taşınacak — **`h_theta` DEĞİL** (2026-08-27 düzeltmesi, bkz. madde 12 kök neden bulgusu: `AnomalyDetector`'ın `tüketim/shape_factor` normalizasyonu hane bazlı, il karışımıyla bölünürse müstakil hanede sıcaklıkla değişmeye devam eder) |
+| `h_theta` | float32 | izlenebilirlik — kalibrasyon satırının il-karışık değeri, hesapta kullanılmaz |
 | `profil_duzeltmesi` | float32 | izlenebilirlik — §1.1'in bileşeni ayrı görülsün |
 | `noise_applied` | float32 | izlenebilirlik |
 | `level_source` / `shape_source` / `temp_source` | category | **kalibrasyon satırından taşınır** |

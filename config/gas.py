@@ -136,6 +136,33 @@ EFH_PAY = 0.1068   # müstakil (Einfamilienhaus)
 MFH_PAY = 0.8932   # apartman (Mehrfamilienhaus)
 assert abs(EFH_PAY + MFH_PAY - 1.0) < 1e-9, "EFH_PAY + MFH_PAY toplamı 1 değil"
 
+# Adım 3b — madde 12 kök neden düzeltmesi (2026-08-27): yukarıdaki EFH_PAY/MFH_PAY Marmara
+# GENELİ tek bir sabit — `h_theta_mix`'in bunlarla kurduğu karışım her il için AYNI. Ama
+# gerçek müstakil oranı ile göre %9,64 (Bursa) ile %19,69 (Çanakkale) arasında değişiyor;
+# bu yüzden `Σ_i profil_düzeltmesi_i/n = 1` özdeşliği (adim-03b-...yonergesi.md §1.1) yalnız
+# global orana yakın illerde (İstanbul/Kocaeli/Bursa) tutuyor, uzak illerde (Çanakkale,
+# Kırklareli) ±%2'ye varan sistematik sapma veriyordu (doğrulama madde 12'de yakalandı).
+# `households.parquet`'ten (salt okuma) BİR KEZ ölçüldü — kombi havuzu içinde
+# konut_tipi=='mustakil' oranı, il bazında (2026-08-27). Popülasyon deterministik/donmuş
+# olduğu için koşu anında yeniden hesaplanmaz (Adım 3'ün `W_BOLGE` deseniyle aynı gerekçe).
+# Yukarıdaki GLOBAL EFH_PAY/MFH_PAY SİLİNMEDİ — Faz 2 spike testinde ve `isaret_testi()`'nde
+# kullanılıyor, oraya dokunulmadı.
+EFH_PAY_IL = {
+    10: 0.170803,  # Balıkesir
+    11: 0.140164,  # Bilecik
+    16: 0.096422,  # Bursa
+    17: 0.196925,  # Çanakkale
+    22: 0.162437,  # Edirne
+    34: 0.097862,  # İstanbul
+    39: 0.195252,  # Kırklareli
+    41: 0.102633,  # Kocaeli
+    54: 0.179805,  # Sakarya
+    59: 0.118357,  # Tekirdağ
+    77: 0.143420,  # Yalova
+}
+assert len(EFH_PAY_IL) == 11, f"EFH_PAY_IL 11 il yerine {len(EFH_PAY_IL)} il içeriyor"
+assert all(0.0 < v < 1.0 for v in EFH_PAY_IL.values()), "EFH_PAY_IL [0,1] dışında"
+
 
 # --- Sıcaklık ağırlıklandırma — BDEW termal atalet modeli -------------------------
 # theta_ref(d) = (T_d + 0.5*T_{d-1} + 0.25*T_{d-2} + 0.125*T_{d-3}) / 1.875
