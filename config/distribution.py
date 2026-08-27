@@ -19,7 +19,7 @@ vektörel de üretilebiliyor (Philox4x64, bir sayaç turunda 4 ham kelime üreti
 
 import numpy as np
 import pandas as pd
-from scipy.stats import norm
+from scipy.special import ndtri
 
 from config.epias import AC_SEASONAL_DELTA_BY_MONTH
 
@@ -120,9 +120,17 @@ def _addressable_raw_words_bulk(key: int, household_no_: int, time_index_start: 
 
 
 def _words_to_lognormal(words: np.ndarray, sigma: float) -> np.ndarray:
-    """Ham kelime(ler) -> uniform -> ters normal CDF -> log-normal, E[.] = 1.0 tam olarak."""
+    """Ham kelime(ler) -> uniform -> ters normal CDF -> log-normal, E[.] = 1.0 tam olarak.
+
+    `scipy.special.ndtri` kullanılır, `scipy.stats.norm.ppf` DEĞİL — Adım 4 (F4a) Karar 1
+    (2026-08-27, bkz. adim-04-generator-yonergesi.md §1/§2). `norm._ppf`'in kendisi zaten
+    `ndtri`'yi çağırıyor; fark yalnız `rv_continuous` sarmalayıcısının argüman doğrulaması,
+    bu da mesaj başına ~160-320 µs sabit masrafın kaynağıydı (skaler yolda iki çağrı,
+    jitter+drift). Bit-özdeşlik `np.array_equal` ile n=1/24/720/100.000/1.000.000'da,
+    hem üretilen `z` hem nihai log-normal değerinde, ÜÇ ortamda (iki farklı donanım +
+    konteyner) doğrulandı — kod yorumunda tekrarlanmıyor, kanıt commit gövdesinde."""
     u = (np.asarray(words, dtype=np.float64) + 0.5) * _UWORD_TO_UNIFORM
-    z = norm.ppf(u)
+    z = ndtri(u)
     return np.exp(-0.5 * sigma**2 + sigma * z)
 
 
