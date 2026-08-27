@@ -252,13 +252,13 @@ Adım 3'ün 16 maddesi taban alınır, ikisi düşer, dördü eklenir.
 | 3 | Gaz: `consumption_m3 > 0`, NaN/inf yok. Katı yakıt: `consumption_kwh ≥ 0` (yazın 0 meşru) |
 | 4 | Makullük bandı yüzdelikle: gaz %99,9 dilimi < 3 m³/saat; %0,1 dilimi > 0 |
 | 5 | `(household_id, measured_at)` çifti benzersiz |
-| 6 | **Günlük geri-toplam:** her (il, gün) için `Σ consumption` hedefe **±%0,1** |
-| 7 | **Aylık geri-toplam:** her (il, ay) için aynı — gazda kalibrasyon zaten aya kilitli |
+| 6 | **Günlük geri-toplam:** her (il, gün) için `Σ consumption` hedefe, Adım 3'ün `validate_distribution.py::_sample_size_tolerance` ile AYNI formülle türetilmiş örneklem-boyutu toleransı içinde (`safety_factor × NOISE_SIGMA × √(E[bm²]/N)` — iki adımın doğrulaması aynı mantıkla okunmalı). **±%0,1, TAM POPÜLASYON ölçeğinde ayrı bir ÜRETİM HEDEFİ** (bu haliyle örneklem testinde kullanılmaz, bkz. Ek A) |
+| 7 | **Aylık geri-toplam:** her (il, ay) için aynı formül — gazda kalibrasyon zaten aya kilitli |
 | 8 | Aynı seed ile tekrar koşuda **bit-bit** aynı |
 | 9 | **Adreslenebilirlik:** rastgele 100 çift tek tek hesaplandığında toplu üretimle birebir aynı |
 | 10 | **Pencere bağımsızlığı:** farklı `start_date` ile kesişen çiftler değişmiyor |
 | 11 | **Profil ayrımı:** müstakil hanelerin kış/yaz genlik oranı, apartmanlarınkinden **belirgin yüksek** (EFH `h(θ)` daha dik) |
-| 12 | **`Σ profil_düzeltmesi / n ≈ 1,0`** her (il, gün) için ±%0,5 — §1.1'in değişmezinin doğrudan testi |
+| 12 | **`Σ profil_düzeltmesi / n ≈ 1,0`** her (il, gün) için — §1.1'in değişmezinin doğrudan testi. Tolerans, madde 6/7'den FARKLI bir gürültü kaynağından türetilir (EFH/MFH örneklem payının binom gürültüsü, `base_multiplier`'dan bağımsız): `safety_factor × √(p(1-p)/n) × \|h_EFH(θ)-h_MFH(θ)\| / h_mix_il(θ)`, `p = EFH_PAY_IL[il]`. **±%0,5, TAM POPÜLASYON ölçeğinde ayrı bir hedef** (Ek A) |
 | 13 | `base_multiplier` ile ortalama tüketim korelasyonu pozitif ve güçlü |
 | 14 | **Katı yakıt: Haziran–Ağustos tüm satırlar TAM 0**; kg kolonları da 0 |
 | 15 | **Yakıt karışımı:** örneklemdeki kömür/odun hane oranı popülasyonunkiyle ±%2 |
@@ -269,6 +269,10 @@ Adım 3'ün 16 maddesi taban alınır, ikisi düşer, dördü eklenir.
 **Düşen maddeler ve gerekçesi yazılsın:** Adım 3'ün AC ile ilgili maddeleri (11, 12) burada
 karşılıksız — gazda `has_ac`'ın rolü yok. Yerlerine 11 (profil ayrımı) ve 12 (düzeltme
 değişmezi) geldi.
+
+**Not (2026-08-27):** madde 6/7 ile madde 12'nin tolerans formülleri BİLEREK farklı —
+gürültü kaynakları farklı (çarpımsal lognormal, `base_multiplier`+Philox gürültüsü vs.
+profil çekilişinin binom gürültüsü). Birleştirilmemeli.
 
 ### Örneklem penceresi — doğrulamanın işe yaraması için
 
