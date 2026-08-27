@@ -28,6 +28,10 @@ COPY data/epdk/ /data/epdk/
 COPY data/gazbir/ /data/gazbir/
 COPY data/igdas/ /data/igdas/
 
+# Adim 4: src/payload.py altin dosya testi icin tests/golden/'i mutlak DEGIL, /app'e
+# GORELI (Path(__file__)'e gore) okuyor; ayni gerekce - kucuk, statik, versiyonlu.
+COPY tests/golden/ ./tests/golden/
+
 ENV PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app
 

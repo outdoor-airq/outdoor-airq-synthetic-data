@@ -1,0 +1,14 @@
+{
+  "household_id": "MARMARA_00714233",
+  "dagitim_sirketi": "UEDAŞ",
+  "il": "Balıkesir", "ilce": "Ayvalık", "yerlesim": "Altınova",
+  "measured_at": "2026-01-14T19:00:00+03:00",
+  "consumption_kwh": 11.240,
+  "heating_type": "soba",
+  "fuel_type": "komur",
+  "theta_ref": 3.1,
+  "shape_factor": 2.41,
+  "level_source": "tuik_national_derived",
+  "shape_source": "hdd_proportional",
+  "temp_source": "open_meteo"
+}

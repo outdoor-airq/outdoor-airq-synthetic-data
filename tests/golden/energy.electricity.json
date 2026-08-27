@@ -1,0 +1,10 @@
+{
+  "household_id": "MARMARA_03482910",
+  "dagitim_sirketi": "BEDAŞ",
+  "il": "İstanbul", "ilce": "Kadıköy", "yerlesim": "Fenerbahçe",
+  "measured_at": "2026-07-27T14:00:00+03:00",
+  "consumption_kwh": 1.842,
+  "household_profile": "mesken_apartman_3kisi",
+  "level_source": "epias_monthly",
+  "shape_source": "synthetic_curve"
+}

@@ -1,0 +1,14 @@
+{
+  "household_id": "MARMARA_03482910",
+  "dagitim_sirketi": "BEDAŞ",
+  "gaz_dagitim_sirketi": "İGDAŞ",
+  "il": "İstanbul", "ilce": "Kadıköy", "yerlesim": "Fenerbahçe",
+  "measured_at": "2026-01-14T19:00:00+03:00",
+  "consumption_m3": 6.412,
+  "heating_type": "kombi",
+  "theta_ref": 4.8,
+  "shape_factor": 1.83,
+  "level_source": "gazbir_monthly",
+  "shape_source": "bdew_sigmoid",
+  "temp_source": "open_meteo"
+}
