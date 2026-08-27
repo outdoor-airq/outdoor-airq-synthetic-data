@@ -389,3 +389,13 @@ Claude Code bu dosyaya sadece kullanıcı onayı sonrası satır ekler, sonra co
   Host/konteyner md5 karşılaştırması (adım 5) port çatışması nedeniyle yapılamadı — birincil kanıt değil, ek kontroldü; asıl işi bloke etmedi.
 
   `NOISE_SIGMA`/`DAILY_DRIFT_SIGMA`/`HOURLY_JITTER_SIGMA` değişmedi. — onaylayan: yusuf
+
+- [2026-08-27] adim4-ci-kirmizi-kaniti: `.github/workflows/test.yml`'in (Adım 4 Karar — §4.2 altın dosya testini otomatik koşturma) GERÇEKTEN bir şeyi yakaladığının kanıtı — yeşil bir CI'ın testi koştuğunu değil, bir şeyin başarısız olmadığını gösterdiği bilinir (pytest'in "no tests collected" ile 0 dönmesi, adımın atlanması, path filtresinin dışlaması hepsi yeşil verir).
+
+  **Adım 1 — doğru hâliyle yeşil:** `adim4-generator` branch'i push edildi, Actions [run 33076758462](https://github.com/outdoor-airq/outdoor-airq-synthetic-data/actions/runs/33076758462) → **success**, 7/7 test geçti.
+
+  **Adım 2 — tek kullanımlık `ci-kirmizi-kanit` branch'inde kasten bozuldu:** `tests/golden/energy.gas.json`'da `"shape_factor"` anahtarı `"shape_fctor"` yapıldı (tek karakter, `a`→yok). Push edildi, Actions [run 33076948658](https://github.com/outdoor-airq/outdoor-airq-synthetic-data/actions/runs/33076948658) → **failure**, log: `tests/test_payload_golden.py::test_altin_dosya_anahtar_ve_tip[energy.gas] FAILED`, **"1 failed, 6 passed" — 7 testten yalnız 1'i düştü** (tam beklenen: yalnız `energy.gas` parametrik durumu; `energy.electricity`/`energy.solidfuel` ile 3 negatif senaryo — fazla/eksik alan, tip uyumsuzluğu, naive-datetime — etkilenmedi). Bu, altın dosya testinin kapsama gücü hakkında bilgi veren sayı: bir anahtarı bozmak yalnız O ALANI/O TOPIC'İ sınayan testi düşürüyor, başka hiçbir şeyi maskelemeden.
+
+  **Adım 3 — temizlik, "yeşile dönüş" ayrı bir koşu GEREKTİRMEDİ:** `ci-kirmizi-kanit` hem uzaktan (`git push origin --delete`) hem yerelden (`git branch -D`) silindi. `adim4-generator`'a bu işlem hiç dokunmadı — bozuk commit yalnız throwaway branch'te vardı, `adim4-generator` zaten Adım 1'in [run 33076758462](https://github.com/outdoor-airq/outdoor-airq-synthetic-data/actions/runs/33076758462)'te kanıtlanmış yeşil hâlindeydi ve öyle kaldı; force-push ya da revert-çifti gerekmedi, "yeşile dönüş" burada branch'i silmekle eşdeğer.
+
+  **Sonuç: CI hattı gerçek, işlevsiz-yeşil değil.** — onaylayan: yusuf
