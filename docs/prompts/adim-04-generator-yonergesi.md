@@ -60,41 +60,58 @@ budur.
 
 ---
 
-## 1. Ölçülmüş gerçek: skaler yol canlı yayını taşımıyor
+## 1. Ölçülmüş gerçek: skalerin marjı yok, toplunun 51-78 katı var
 
 Bu bölüm bu adımın mimarisini belirleyen ölçümdür. Tartışma buradan yürütülmeli.
+
+> **Sürüm uyarısı (2026-08-27 düzeltmesi):** Bu bölümün ilk taslağı tek bir ortamda
+> ölçülmüştü ve "skaler yol hedefin altında kalıyor" diye çerçevelenmişti — bu **donanıma
+> bağlı, yanlış** bir iddiaydı. İki ayrı ortamda ölçüldü:
+> - **Ortam 1 ("paylaşımlı bulut kutusu"):** numpy 2.5.2, scipy 1.18.1, pandas 3.0.5.
+> - **Ortam 2 ("repo pinleri"):** numpy 1.26.4, scipy 1.13.1, pandas 2.2.2 (repo
+>   `requirements.txt` ile birebir), AMD Ryzen 5 7640HS, Windows.
+>
+> **Hedef donanım (masterplan deploy-backlog: ≥4 vCPU / 8 GB) ikisi de DEĞİL.** Mutlak
+> msj/sn sayıları donanıma göre 2-4× oynuyor — bu adımın kararı **mutlak sayıya değil,
+> ORANA** dayanıyor, ve oran iki donanımda da aynı yönde ve devasa. Esas alınan Ortam 2
+> (repo'nun gerçekte pinlediği sürümler); Ortam 1 yalnız "daha yavaş donanım sınırı"
+> olarak, ayrı sütunda tutuluyor.
 
 ### 1.1 Ölçüm
 
 `distribute_gas_household` (tek hane, tek saat — mevcut docstring'in *"canlı yayının
 ihtiyacı budur"* dediği fonksiyon) ve `distribute_gas_household_bulk` (tek hane, ardışık
-N saat), aynı makinede, tek çekirdek:
+N saat), her ortamda kendi içinde, tek çekirdek:
 
-| Yol | µs/mesaj | mesaj/sn |
+| Yol | Ortam 1 msj/sn | Ortam 2 msj/sn (repo pini) |
 |---|---:|---:|
-| `distribute_gas_household` (skaler) | 531,4 | **1.882** |
-| `distribute_gas_household_bulk`, N=24 | 92,7 | 10.790 |
-| `distribute_gas_household_bulk`, N=168 | 13,9 | 71.934 |
-| `distribute_gas_household_bulk`, N=720 | 3,37 | **296.848** |
+| `distribute_gas_household` (skaler) | 1.882 | 5.944,5 |
+| `distribute_gas_household_bulk`, N=24 | 10.790 | 40.729,5 |
+| `distribute_gas_household_bulk`, N=168 | 71.934 | 245.483,1 |
+| `distribute_gas_household_bulk`, N=720 | 296.848 | 705.093,8 |
 
 Masterplan §2.1'in hedefi: **elektrik + gaz, saate düzgün yayılmış = 4.740 msj/sn.**
 
-**Skaler yol tek çekirdekte 1.882 msj/sn yapıyor — hedefin 2,5 katı ALTINDA.** Elektriğin
-tek başına gereksinimi olan 2.370 msj/sn'yi bile karşılamıyor.
+**Doğru iddia mutlak sayı değil, oran: skalerin canlı yayın için marjı yok, toplunun
+51-78 katı var** (ndtri sonrası kesin oranlar §1.3'te). Ortam 1'de skaler hedefin altında
+(1.882 < 4.740), Ortam 2'de üstünde (5.944,5 > 4.740, ~%25 marjla — JSON/ağ/işletim payı
+hiç sayılmadan). **İkisi de doğru okuma değil** — hangi donanımda kaç olacağı dağıtıma
+kadar bilinemez, ve zaten skaler yolun mimarideki rolü canlı yayın değil (bkz. §1.3 sonu).
+Kararı taşıyan şey donanımdan (nispeten) bağımsız olan **oran**.
 
 ### 1.2 Nedeni — sabit çağrı masrafı, hesap değil
 
 Bileşen kırılımı (N=24 için, tek çağrı başına sabit maliyet):
 
-| Bileşen | µs | Not |
-|---|---:|---|
-| `bulk_daily_drift` | 263,2 | içinden ~161 µs `scipy.stats.norm.ppf` sabit masrafı |
-| `bulk_hourly_jitter` | 272,4 | aynı |
-| `pd.DataFrame` kurulumu (14 kolon) | **732,0** | tek en büyük sabit kalem |
-| `h_theta_profile` (vektör) | 10,9 | ihmal edilebilir |
-| saf `dict` (DataFrame yok) | **2,5** | 293× ucuz |
+| Bileşen | Ortam 1 µs | Ortam 2 µs (repo pini) | Not |
+|---|---:|---:|---|
+| `bulk_daily_drift` | 263,2 | 77,3 | içinden `scipy.stats.norm.ppf` sabit masrafı |
+| `bulk_hourly_jitter` | 272,4 | 91,6 | aynı |
+| `pd.DataFrame` kurulumu (14 kolon) | **732,0** | 224,0 | her iki ortamda da tek en büyük sabit kalem |
+| `h_theta_profile` (vektör) | 10,9 | 6,4 | ihmal edilebilir |
+| saf `dict` (DataFrame yok) | **2,5** | 6,0 | her iki ortamda da diğerlerinden bir mertebe ucuz |
 
-`scipy.stats.norm.ppf`'in ölçekle davranışı:
+`scipy.stats.norm.ppf`'in ölçekle davranışı (Ortam 1):
 
 | n | süre | değer/sn |
 |---:|---:|---:|
@@ -102,27 +119,64 @@ Bileşen kırılımı (N=24 için, tek çağrı başına sabit maliyet):
 | 100 | 168,8 µs | 592.369 |
 | 10.000 | 681,0 µs | 14.684.655 |
 
-Yani `norm.ppf` **çağrı başına ~160 µs sabit masraf** taşıyor, `n`'den bağımsız. Skaler
-yolda mesaj başına iki kez çağrılıyor (jitter + drift) → tek başına ~320 µs.
+Yani `norm.ppf` **çağrı başına sabit bir masraf** taşıyor, `n`'den bağımsız (Ortam 1'de
+~160 µs, Ortam 2'de daha düşük — bkz. §1.3'ün A.3 tablosu). Skaler yolda mesaj başına iki
+kez çağrılıyor (jitter + drift).
 
-**Sonuç: maliyet aritmetikte değil, çağrı başına sabit masrafta.** Toplu çalışmak bu
-masrafı N'e böler; skaler çalışmak her mesajda yeniden öder.
+**Sonuç: maliyet aritmetikte değil, çağrı başına sabit masrafta — bu, donanımdan BAĞIMSIZ
+bir yapısal gerçek.** Toplu çalışmak bu masrafı N'e böler; skaler çalışmak her mesajda
+yeniden öder. Sabit masrafın MUTLAK büyüklüğü donanıma göre değişir (Ortam 2'de 3-3,4×
+daha ucuz), ama VAR OLUŞU ve N'e bölünebilir OLUŞU değişmez — mimari kararı taşıyan bu.
 
 ### 1.3 Sonuç — iki düzeltme, ikisi de bu adımda
 
-1. `norm.ppf` → `scipy.special.ndtri` (Karar 1). **Bit-özdeş**, ölçülen hızlanma n=1'de
-   178×. Skaler yolu 1.882 → **4.680 msj/sn**'e çıkarıyor.
-2. Yayın yolunda `pd.DataFrame` kullanılmaz (Karar 2). Dizi → `dict` → JSON zinciri
-   ölçüldü: **~23 µs/mesaj → ~43.000 msj/sn** tek çekirdek.
+1. `norm.ppf` → `scipy.special.ndtri` (Karar 1). **Bit-özdeş, iki ortamda da doğrulandı**
+   (`np.array_equal`, n=1/24/720/100.000). Hızlanma donanıma göre değişiyor ama yön aynı:
 
-`ndtri`'den sonra bile skaler yol 4.680 msj/sn ile hedefin (4.740) **altında** kalıyor —
-JSON serileştirme, ağ ve işletim payı hiç sayılmadan. Toplu yol aynı düzeltmeden sonra
-**363.298 msj/sn**. Aradaki fark 78×. Mimari bu farkın üstüne kurulacak.
+   | n | Ortam 1 hızlanma | Ortam 2 hızlanma (repo pini) |
+   |---:|---:|---:|
+   | 1 | 178,5× | 121,2× |
+   | 24 | 114,5× | 57,1× |
+   | 720 | 9,9× | 3,7× |
+   | 100.000 | 3,5× | 1,7× |
+
+   Ortam 2'nin oranı sistematik olarak düşük (scipy 1.13.1'in `norm.ppf` sarmalayıcısı
+   1.18.1'inkinden zaten daha ucuz) — ama mutlak sürede ikisi de kazanıyor, yön hiç
+   değişmiyor. Skaler yolu (ndtri sonrası) Ortam 1'de 1.882→4.680, Ortam 2'de
+   5.944,5→16.485,9 msj/sn'e çıkarıyor.
+2. Yayın yolunda `pd.DataFrame` kullanılmaz (Karar 2). Dizi → `dict` → JSON zinciri
+   ölçüldü — bkz. §1.4, bu zincir donanımdan neredeyse bağımsız çıktı.
+
+**Asıl bulgu oran, mutlak sayı değil:** `ndtri`'den sonra bulk N=720/skaler oranı Ortam
+1'de 363.298/4.680 = **78×**, Ortam 2'de 843.270,5/16.485,9 = **51×**. İki donanımda da
+devasa, aynı yönde — mimari bu oranın üstüne kurulacak, hangi donanımda mutlak sayının
+4.740'ın altında mı üstünde mi kalacağının üstüne değil.
 
 > **`heating_distribution.py` ve `household_distribution.py`'ın docstring'lerindeki
 > *"Canlı yayının ihtiyacı budur"* cümlesi bu ölçümle YANLIŞLANDI ve düzeltilecek.**
 > Skaler fonksiyonlar doğru ve değerli — ama rolleri *referans/oracle* (toplu yolun
 > doğrulandığı sağlama), yayın yolu değil.
+
+### 1.4 Yayın yolu donanımdan bağımsız — asıl bağlayıcı kısıt burada
+
+İki ortamın hesap (bulk) ve yayın (dict+JSON) rakamları **zıt yönde** davranıyor:
+
+| Zincir | Ortam 1 | Ortam 2 (repo pini) | Oran |
+|---|---:|---:|---:|
+| Hesap — `bulk` N=720 (ndtri sonrası) | 363.298 msj/sn | 843.270,5 msj/sn | **2,3× hızlı** |
+| Yayın — dict+JSON toplamı | ~43.478 msj/sn | ~36.809 msj/sn | **0,85× — daha YAVAŞ** |
+
+**Hesap donanımla 2-4× oynuyor; yayın yolu neredeyse oynamıyor** (aynı yönde bile değil —
+Ortam 2 hesapta hızlı, yayında yavaş). Yayın tavanı (~37-43k msj/sn) hem donanımdan
+büyük ölçüde bağımsız bir sabit gibi davranıyor hem de hedefin (4.740) yalnız **8-9
+katı** — bulk hesabın hedefe oranından (77-190×) çok daha dar bir marj. Sonuç: **asıl
+bağlayıcı kısıt yayın yolu, hesap değil.**
+
+Bu, Karar 2'yi (hesap/yayın ayrımı) **bağımsız bir açıdan** doğruluyor: iki aşama farklı
+donanım duyarlılığı gösteriyor (hesap donanıma duyarlı ve bol marjlı, yayın donanıma
+duyarsız ve dar marjlı) — tek bir boru hattında bu iki farklı davranış birbirine karışırdı;
+ayrı aşamalar her birinin kendi darboğazına göre ayrı ayrı büyütülmesini (ör. yayını çok
+işlemli/çok makineli yapmak, hesabı tek makinede toplu tutmak) mümkün kılıyor.
 
 ---
 
@@ -194,18 +248,20 @@ Ayrımın dört somut getirisi:
 `W` = bir `bulk` çağrısının kapsadığı saat sayısı. Ölçülen etkisi (§1.1) ile disk maliyeti
 ters yönde çalışıyor — **bu adımın tek gerçek tasarım takasıdır.**
 
-Tam popülasyon (8.529.528 hane × 2 emtia), hedef donanım 4 vCPU:
+Tam popülasyon (8.529.528 hane × 2 emtia), 4 vCPU varsayımıyla, **iki ölçüm ortamında**
+(§1'in sürüm uyarısı — hedef donanım ikisi de değil, ama ORAN her ikisinde de aynı yönde
+yeterli):
 
-| W | msj/sn (1 çekirdek, `ndtri` sonrası) | 1 simüle gün için | 4 çekirdekte gerçek-zaman katı | Blok başına disk (kaba) |
+| W | msj/sn Ortam 1 | msj/sn Ortam 2 (repo pini) | 4 çekirdek gerçek-zaman katı — O1 / O2 | Blok başına disk (kaba) |
 |---:|---:|---:|---:|---:|
-| 24 (1 gün) | 13.705 | 8,3 çekirdek-saat | **~11,6×** | ~8–16 GB |
-| 168 (1 hafta) | 89.882 | 1,3 çekirdek-saat | ~75× | ~60–110 GB |
-| 720 (1 ay) | 363.298 | 0,3 çekirdek-saat | ~300× | ~250–450 GB |
+| 24 (1 gün) | 13.705 | 59.732,0 | **~11,6× / ~50,4×** | ~8–16 GB |
+| 168 (1 hafta) | 89.882 | 280.290,9 | ~75× / ~236,5× | ~60–110 GB |
+| 720 (1 ay) | 363.298 | 843.270,5 | ~300× / ~711,7× | ~250–450 GB |
 
-**Karar: `W = 24` varsayılan.** Gerekçe: hedef donanımda 11,6× gerçek-zaman payı canlı
-yayın için fazlasıyla yeterli (yayın tarafı zaten 4.740 msj/sn istiyor) ve tek blok disk
-maliyeti hedef donanımda tutulabilir. `W` **parametre** olacak — F5'in backfill'i onu
-yükseltebilsin.
+**Karar: `W = 24` varsayılan.** Gerekçe: **iki donanımda da** (11,6× ve 50,4×) gerçek-zaman
+payı canlı yayın için fazlasıyla yeterli (yayın tarafı zaten 4.740 msj/sn istiyor, ve §1.4
+gösteriyor ki asıl darboğaz zaten hesap değil yayın) ve tek blok disk maliyeti tutulabilir.
+`W` **parametre** olacak — F5'in backfill'i onu yükseltebilsin.
 
 Öbek boyu (`chunk_size`, aynı anda işlenen hane sayısı) bellek tavanını belirler;
 varsayılan `50.000`, parametre. Hedef: RSS < 4 GB.
@@ -458,9 +514,10 @@ mimarisinin gerçekten kapandığı an burasıdır.
 
 **2. Üretim tarafının kapasitesinin ilk kez bilinmesi.** Masterplan §1.2 dört darboğaz
 sayıyor (D1–D4) ve **dördü de akışın aşağısında.** Generator'ın kendi tavanı hiç
-ölçülmemişti. §1.1 gösteriyor ki mevcut skaler yol hedefin altında kalıyordu — yani
-D1'den önce patlayacak, kimsenin listesinde olmayan bir darboğaz vardı. Bu adım onu
-kapatıyor ve sayıyı kayda geçiriyor.
+ölçülmemişti. §1.1/§1.4 gösteriyor ki skaler yolun canlı yayın için marjı yok (donanıma
+göre hedefin altında ya da dar bir üstünde) ve asıl bağlayıcı kısıt yayın yolu — yani
+D1'den önce patlayabilecek, kimsenin listesinde olmayan darboğazlar vardı. Bu adım onları
+kapatıyor ve sayıları kayda geçiriyor.
 
 **3. Kafka sözleşmesinin kâğıttan koda geçmesi.** §10/§10.1 bugüne kadar yalnız dokümanda
 duruyordu. Altın dosya testiyle birlikte sözleşme artık **çalıştırılabilir** hale geliyor —
@@ -474,46 +531,62 @@ bağlanacağı broker yok. O F3'ün işi.
 
 ## Ek A — Ölçülmüş sayılar
 
-Ölçüm ortamı: paylaşımlı Linux kutusu, Python 3.12, numpy 2.5.2, scipy 1.18.1,
-pandas 3.0.5, tek çekirdek. **Hedef donanımda yeniden ölçülecek** (§8 madde 2).
+**İki ayrı ölçüm ortamı — sürüm uyarısı (2026-08-27 düzeltmesi):**
+
+- **Ortam 1 ("paylaşımlı bulut kutusu"):** Python 3.12, numpy 2.5.2, scipy 1.18.1,
+  pandas 3.0.5, tek çekirdek.
+- **Ortam 2 ("repo pinleri"):** Python 3.12, numpy 1.26.4, scipy 1.13.1, pandas 2.2.2 —
+  repo `requirements.txt` ile birebir, AMD Ryzen 5 7640HS, Windows, tek çekirdek.
+
+**Hedef donanım (masterplan deploy-backlog: ≥4 vCPU / 8 GB) İKİSİ DE DEĞİL.** Esas alınan
+Ortam 2 (repo'nun fiilen pinlediği sürümler); Ortam 1 yalnız "daha yavaş donanım sınırı"
+olarak tutuluyor. Gerçek sayı K3 kademesinde (§5) hedef donanımda ölçülecek — bu ikisi
+yalnız Karar 3'ün oranının donanımdan bağımsız olduğunu göstermek için var.
 
 **A.1 — Mesaj başına maliyet**
 
-| Yol | önce (µs) | `ndtri` sonrası (µs) | önce (msj/sn) | sonra (msj/sn) |
-|---|---:|---:|---:|---:|
-| skaler (`distribute_gas_household`) | 563,9 | 213,7 | 1.773 | **4.680** |
-| `bulk`, N=24 | 91,3 | 72,9 | 10.952 | 13.705 |
-| `bulk`, N=168 | 13,3 | 11,1 | 75.350 | 89.882 |
-| `bulk`, N=720 | 3,25 | 2,75 | 308.023 | **363.298** |
+| Yol | O1 önce (µs) | O1 `ndtri` sonrası (µs) | O1 önce (msj/sn) | O1 sonra (msj/sn) | O2 önce (msj/sn) | O2 sonra (msj/sn) |
+|---|---:|---:|---:|---:|---:|---:|
+| skaler (`distribute_gas_household`) | 563,9 | 213,7 | 1.773 | 4.680 | 5.944,5 | **16.485,9** |
+| `bulk`, N=24 | 91,3 | 72,9 | 10.952 | 13.705 | 40.729,5 | 59.732,0 |
+| `bulk`, N=168 | 13,3 | 11,1 | 75.350 | 89.882 | 245.483,1 | 280.290,9 |
+| `bulk`, N=720 | 3,25 | 2,75 | 308.023 | 363.298 | 705.093,8 | **843.270,5** |
 
 **A.2 — Sabit çağrı masrafı (N=24, tek `bulk` çağrısı)**
 
-| Bileşen | µs |
-|---|---:|
-| `bulk_daily_drift` | 263,2 |
-| `bulk_hourly_jitter` | 272,4 |
-| `pd.DataFrame` (14 kolon) | 732,0 |
-| `h_theta_profile` (vektör) | 10,9 |
-| saf `dict` | 2,5 |
+| Bileşen | O1 µs | O2 µs |
+|---|---:|---:|
+| `bulk_daily_drift` | 263,2 | 77,3 |
+| `bulk_hourly_jitter` | 272,4 | 91,6 |
+| `pd.DataFrame` (14 kolon) | 732,0 | 224,0 |
+| `h_theta_profile` (vektör) | 10,9 | 6,4 |
+| saf `dict` | 2,5 | 6,0 |
 
-**A.3 — `norm.ppf` vs `ndtri` (bit-özdeş, `np.array_equal` ile doğrulandı)**
+**A.3 — `norm.ppf` vs `ndtri` (bit-özdeş, `np.array_equal` ile İKİ ortamda da doğrulandı)**
 
-| n | `norm.ppf` | `ndtri` | hızlanma |
-|---:|---:|---:|---:|
-| 1 | 139,2 µs | 0,78 µs | **178,5×** |
-| 24 | 179,7 µs | 1,57 µs | 114,5× |
-| 720 | 219,1 µs | 22,2 µs | 9,9× |
-| 100.000 | 10,3 ms | 2,94 ms | 3,5× |
+| n | O1 `norm.ppf` | O1 `ndtri` | O1 hızlanma | O2 `norm.ppf` | O2 `ndtri` | O2 hızlanma |
+|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 139,2 µs | 0,78 µs | 178,5× | 39,5 µs | 0,33 µs | 121,2× |
+| 24 | 179,7 µs | 1,57 µs | 114,5× | 61,5 µs | 1,08 µs | 57,1× |
+| 720 | 219,1 µs | 22,2 µs | 9,9× | 83,1 µs | 22,6 µs | 3,7× |
+| 100.000 | 10,3 ms | 2,94 ms | 3,5× | 5,51 ms | 3,15 ms | 1,7× |
+
+O2'nin hızlanma oranı sistematik olarak düşük (scipy 1.13.1'in `norm.ppf`'i zaten daha az
+sarmalayıcı-maliyetli) — ama mutlak sürede O2 her satırda daha hızlı, yön değişmiyor.
 
 **A.4 — Yayın yolu**
 
-| Adım | µs/mesaj | msj/sn |
-|---|---:|---:|
-| dizi → `dict` listesi | 10,59 | 94.456 |
-| `json.dumps` + `encode` | 12,41 | 80.562 |
-| **toplam yayın yolu** | **~23** | **~43.000** |
+| Adım | O1 µs/mesaj | O1 msj/sn | O2 µs/mesaj | O2 msj/sn |
+|---|---:|---:|---:|---:|
+| dizi → `dict` listesi | 10,59 | 94.456 | 20,04 | 49.910 |
+| `json.dumps` + `encode` | 12,41 | 80.562 | 7,13 | 140.240 |
+| **toplam yayın yolu** | **~23** | **~43.478** | **~27,2** | **~36.809** |
 
-Payload boyutu (gaz, §10.1 örneği): **395 bayt** ham JSON.
+**Bu satır §1.4'ün bulgusu: yayın yolu donanımla neredeyse değişmiyor, hatta O2'de hesabın
+tersine YAVAŞLIYOR (0,85×)** — hesap (A.1, `bulk` N=720) O2'de 2,3× hızlanırken yayın 0,85×
+yavaşlıyor. Asıl bağlayıcı kısıt burası.
+
+Payload boyutu (gaz, §10.1 örneği): **395 bayt** ham JSON (O1 ölçümü).
 8,5M hane × 24 saat × 2 emtia = **161,7 GB/gün** ham JSON (sıkıştırmasız).
 Masterplan §2.2'nin ~100 B/satır DB tahmini payload boyutu değildir — telde 395 B.
 
@@ -525,6 +598,7 @@ Masterplan §2.2'nin ~100 B/satır DB tahmini payload boyutu değildir — telde
 | Elektrik + gaz, saate düzgün yayılmış | **4.740** |
 | Saat başına sıkışmış (patlama) | 142.000 |
 
-Aşama 2'nin ölçülen tavanı (~43.000 msj/sn) düzgün yayılmış hedefin **9 katı**; patlama
+Aşama 2'nin ölçülen tavanı (O1 ~43.478, O2 ~36.809 msj/sn) düzgün yayılmış hedefin
+**8-9 katı**; patlama
 senaryosunun altında — ama masterplan §4.2 zaten patlamayı kaynağında çözüyor
 (*"generator saate yayarak yazar"*), yani patlama senaryosu bu mimaride oluşmuyor.
