@@ -38,6 +38,16 @@ def _saat_dosya_adi(saat: pd.Timestamp) -> str:
     return saat.strftime("%Y-%m-%dT%H")
 
 
+def _hane_meta_ekle(df: pd.DataFrame, ekstra: dict) -> pd.DataFrame:
+    """`distribute_*_bulk`'ın hesap çıktısına, `src/payload.py`'ın ihtiyaç duyduğu ama
+    hesaba GİRMEYEN coğrafi/açıklayıcı alanları ekler (§4.1: `il`/`ilce`/`yerlesim`
+    denormalize, `household_profile`, `dagitim_sirketi`, gazda `gaz_dagitim_sirketi`,
+    `heating_type`). Sabit değerler — hanenin W saatlik bloğunun tamamına yayılır."""
+    for kolon, deger in ekstra.items():
+        df[kolon] = deger
+    return df
+
+
 class _SaatlikYazicilar:
     """W saatlik bir blok için saat başına BİR `ParquetWriter`. Her `ekle()` çağrısı
     (bir öbeğin bir alt grubunun ürettiği satırlar) ilgili saatin dosyasına EKLENİR —
@@ -84,7 +94,10 @@ def generate_gas_stream(
     cal = pd.read_parquet(calibration_path)
     cal = cal[(cal["tarih"] >= gun_araligi[0]) & (cal["tarih"] < gun_araligi[1])]
 
-    kolonlar = ["household_id", "il_kodu", "konut_tipi", "base_multiplier"]
+    kolonlar = [
+        "household_id", "il_kodu", "konut_tipi", "base_multiplier",
+        "dagitim_sirketi", "il_adi", "ilce_adi", "yerlesim_adi",
+    ]
     dataset = ds.dataset(households_path)
     yazicilar = _SaatlikYazicilar(out_dir, "gas", hours)
 
@@ -92,21 +105,33 @@ def generate_gas_stream(
         chunk_df = batch.to_pandas()
         for il_kodu, grup in chunk_df.groupby("il_kodu", observed=True):
             cal_il = cal[cal["il_kodu"] == il_kodu].sort_values("tarih").reset_index(drop=True)
+            gaz_dagitim_sirketi = str(cal_il["gaz_dagitim_sirketi"].iloc[0])
             acilmis = _expand_daily_to_hourly(
                 cal_il, ["gunluk_hane_m3", "theta_ref", "h_theta", "level_source", "shape_source", "temp_source"]
             )
             frames = [
-                distribute_gas_household_bulk(
-                    household_id=hh.household_id, il_kodu=int(il_kodu),
-                    konut_tipi=str(hh.konut_tipi), base_multiplier=float(hh.base_multiplier),
-                    measured_at=acilmis["measured_at"], gunluk_hane_m3=acilmis["gunluk_hane_m3"],
-                    theta_ref=acilmis["theta_ref"], h_theta=acilmis["h_theta"],
-                    level_source=acilmis["level_source"], shape_source=acilmis["shape_source"],
-                    temp_source=acilmis["temp_source"], hour_start=hour_start,
+                _hane_meta_ekle(
+                    distribute_gas_household_bulk(
+                        household_id=hh.household_id, il_kodu=int(il_kodu),
+                        konut_tipi=str(hh.konut_tipi), base_multiplier=float(hh.base_multiplier),
+                        measured_at=acilmis["measured_at"], gunluk_hane_m3=acilmis["gunluk_hane_m3"],
+                        theta_ref=acilmis["theta_ref"], h_theta=acilmis["h_theta"],
+                        level_source=acilmis["level_source"], shape_source=acilmis["shape_source"],
+                        temp_source=acilmis["temp_source"], hour_start=hour_start,
+                    ),
+                    dict(
+                        dagitim_sirketi=str(hh.dagitim_sirketi), gaz_dagitim_sirketi=gaz_dagitim_sirketi,
+                        il=str(hh.il_adi), ilce=str(hh.ilce_adi), yerlesim=str(hh.yerlesim_adi),
+                        heating_type="kombi",
+                    ),
                 )
                 for hh in grup.itertuples(index=False)
             ]
-            yazicilar.ekle(pd.concat(frames, ignore_index=True))
+            grup_df = pd.concat(frames, ignore_index=True)
+            # shape_factor = h_profil_i (hane bazlı) — h_theta DEĞİL (Adım 3b commit
+            # 49b6e6a). sample_heating_distribution.py::build_gas_sample ile AYNI rename.
+            grup_df = grup_df.rename(columns={"h_profil": "shape_factor"})
+            yazicilar.ekle(grup_df)
 
     return yazicilar.kapat()
 
@@ -123,7 +148,10 @@ def generate_solidfuel_stream(
     cal = pd.read_parquet(calibration_path)
     cal = cal[(cal["tarih"] >= gun_araligi[0]) & (cal["tarih"] < gun_araligi[1])]
 
-    kolonlar = ["household_id", "il_kodu", "fuel_type", "base_multiplier"]
+    kolonlar = [
+        "household_id", "il_kodu", "fuel_type", "base_multiplier",
+        "dagitim_sirketi", "il_adi", "ilce_adi", "yerlesim_adi",
+    ]
     dataset = ds.dataset(households_path)
     yazicilar = _SaatlikYazicilar(out_dir, "solidfuel", hours)
 
@@ -135,17 +163,28 @@ def generate_solidfuel_stream(
                 cal_il, ["gunluk_hane_kwh", "hdd", "theta_ref", "level_source", "shape_source", "temp_source"]
             )
             frames = [
-                distribute_solidfuel_household_bulk(
-                    household_id=hh.household_id, il_kodu=int(il_kodu),
-                    fuel_type=str(hh.fuel_type), base_multiplier=float(hh.base_multiplier),
-                    measured_at=acilmis["measured_at"], gunluk_hane_kwh=acilmis["gunluk_hane_kwh"],
-                    hdd=acilmis["hdd"], theta_ref=acilmis["theta_ref"],
-                    level_source=acilmis["level_source"], shape_source=acilmis["shape_source"],
-                    temp_source=acilmis["temp_source"], hour_start=hour_start,
+                _hane_meta_ekle(
+                    distribute_solidfuel_household_bulk(
+                        household_id=hh.household_id, il_kodu=int(il_kodu),
+                        fuel_type=str(hh.fuel_type), base_multiplier=float(hh.base_multiplier),
+                        measured_at=acilmis["measured_at"], gunluk_hane_kwh=acilmis["gunluk_hane_kwh"],
+                        hdd=acilmis["hdd"], theta_ref=acilmis["theta_ref"],
+                        level_source=acilmis["level_source"], shape_source=acilmis["shape_source"],
+                        temp_source=acilmis["temp_source"], hour_start=hour_start,
+                    ),
+                    dict(
+                        dagitim_sirketi=str(hh.dagitim_sirketi),
+                        il=str(hh.il_adi), ilce=str(hh.ilce_adi), yerlesim=str(hh.yerlesim_adi),
+                        heating_type="soba",
+                    ),
                 )
                 for hh in grup.itertuples(index=False)
             ]
-            yazicilar.ekle(pd.concat(frames, ignore_index=True))
+            grup_df = pd.concat(frames, ignore_index=True)
+            # shape_factor = hdd (Karar 3) — aynı rename, sample_heating_distribution.py
+            # ile tutarlı.
+            grup_df = grup_df.rename(columns={"hdd": "shape_factor"})
+            yazicilar.ekle(grup_df)
 
     return yazicilar.kapat()
 
@@ -164,7 +203,10 @@ def generate_electricity_stream(
     cal = pd.read_parquet(calibration_path)
     cal = cal[(cal["measured_at"] >= hours[0]) & (cal["measured_at"] <= hours[-1])]
 
-    kolonlar = ["household_id", "dagitim_sirketi", "base_multiplier", "has_ac"]
+    kolonlar = [
+        "household_id", "dagitim_sirketi", "base_multiplier", "has_ac",
+        "il_adi", "ilce_adi", "yerlesim_adi", "household_profile",
+    ]
     dataset = ds.dataset(households_path)
     yazicilar = _SaatlikYazicilar(out_dir, "electricity", hours)
 
@@ -176,11 +218,17 @@ def generate_electricity_stream(
             ortalama_hane_kwh = cal_bolge["ortalama_hane_kwh"].to_numpy()
             level_source = cal_bolge["level_source"].astype(str).to_numpy()
             frames = [
-                distribute_household_bulk(
-                    household_id=hh.household_id, dagitim_sirketi=str(bolge),
-                    base_multiplier=float(hh.base_multiplier), has_ac=bool(hh.has_ac),
-                    measured_at=measured_at, ortalama_hane_kwh=ortalama_hane_kwh,
-                    level_source=level_source, hour_start=hour_start,
+                _hane_meta_ekle(
+                    distribute_household_bulk(
+                        household_id=hh.household_id, dagitim_sirketi=str(bolge),
+                        base_multiplier=float(hh.base_multiplier), has_ac=bool(hh.has_ac),
+                        measured_at=measured_at, ortalama_hane_kwh=ortalama_hane_kwh,
+                        level_source=level_source, hour_start=hour_start,
+                    ),
+                    dict(
+                        il=str(hh.il_adi), ilce=str(hh.ilce_adi), yerlesim=str(hh.yerlesim_adi),
+                        household_profile=str(hh.household_profile),
+                    ),
                 )
                 for hh in grup.itertuples(index=False)
             ]
