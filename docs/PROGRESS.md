@@ -413,3 +413,19 @@ Claude Code bu dosyaya sadece kullanıcı onayı sonrası satır ekler, sonra co
   **Sözleşme MqttSink'ten bağımsızlaştırıldı:** `tests/test_sinks_error_contract.py` (YENİ) — `FailingSink` test double'ı, `Sink` sözleşmesinin ("write() kurtarılamaz hatada istisna fırlatır, sessizce yutmaz") kendisini ağdan bağımsız, CI'da her koşuda sınıyor. Gerçek ağ testinin YERİNİ TUTMAZ, yalnızca sözleşmeyi kalıcı korumaya alır.
 
   **`MqttSink` üretim kodu bu turda YAZILMADI/DEĞİŞTİRİLMEDİ** — mevcut hâli (paho'nun `wait_for_publish`'ine güvenen) gerçek ağda teslim garantisi VERMEDİĞİ kanıtlandığı için kullanılmamalı; manuel `on_publish`/`on_disconnect` callback tabanlı ACK takibi (paho'nun kendi mekanizmasına güvenmeyen) ayrı bir adımda ele alınacak. — onaylayan: yusuf
+
+- [2026-08-28] adim4-K1-kademesi: Masterplan §5'in K1 kapısı (10.000 hane, "doğruluk", 18 madde geçmeli) koşuldu ve GEÇTİ.
+
+  **Örneklem:** 9.999 hane, `households.parquet`'ten 11 ilin TAMAMINDAN, popülasyonun gerçek kombi/soba oranına orantılı (kombi %92,67 → 9.266 kombi + 733 soba). Kalibrasyon dosyalarına dokunulmadı (salt okuma).
+
+  **Üretim (Aşama 1, W=24, chunk_size=2000, kış penceresi 2025-01-15, `heating_resolution=hourly`):** iki emtia toplamı 239.976 mesaj (gaz 9.266×24=222.384 + katı yakıt 733×24=17.592), süre=10,75 sn → birleşik ~22.323 msj/sn üretim hızı; tepe RSS=244,4 MB, toplam disk (24 saat × 2 emtia)=8,75 MB.
+
+  **RSS UYARISI — bu taban çizgisi DEĞİL, TEK ÖBEK ölçümüdür:** `chunk_size=2000` kullanıldı ama hane sayısı (9.999) zaten `chunk_size` varsayılanının (50.000) altında — öbek döngüsü pratikte tek turda tamamlanmış olabilir, K2/K3'ün "RSS platoda kalmalı" iddiasını bu ölçüm KANITLAMAZ. Yönergenin §5'i buna göre düzeltildi (ayrı commit) — K2'de aynı hane sayısıyla (500.000) `chunk_size=50.000` vs `chunk_size=25.000` çapraz kontrolü yapılacak.
+
+  **Yayın (Aşama 2, `NullSink`, `heating_resolution=hourly`, HER EMTİA KENDİ AYRI KOŞUSUNDA, tam K1 akışının tamamı üzerinde):** gaz — 222.384 kayıt, 67.015,0 msj/sn; katı yakıt — 17.592 kayıt, 57.462,6 msj/sn. (`daily` mod bu turda K1'de ölçülmedi.)
+
+  **`validate_generator.py` (18 madde): 15 GEÇTİ, 3 ATLANDI, 0 FARKLI** — madde 11/12/13 (uzlaşım) K1'de örneklem alt kümesi olduğu için yönerge gereği ATLANDI (beklenen, ±%0,1 aranmadı); madde 11 ayrıca `calibration_electricity.parquet` yokluğuyla da örtüşüyor (bkz. `adim4-mqtt-ack-guvenilmez`'deki gibi iki-sebep ayrımı — K3'te (1) düşer, (2) düşmez). Doğrulama kendi içinde ek `generate_*_stream` çağrıları (madde 3/4/5) yaptığı için toplam ölçülen süre 122,05 sn, tepe RSS 772,4 MB — hedefin (<4 GB) çok altında.
+
+  **Elektrik bu kademede de KOŞULMADI** — `calibration_electricity.parquet` bu ortamda hâlâ yok. K1'in "doğruluk" kapısı yalnız gaz+katı yakıt için geçildi; elektrik yolu ilk gerçek koşusunu bu ortamda henüz yapmadı.
+
+  Tam popülasyonda (8.529.528 hane, K3) örneklem gürültüsü ortadan kalkacağı için madde 11-13 kimlik testine dönüşecek — bu kademe yalnız K1'in doğruluk kapısını kanıtlıyor, K2/K3'ün ölçek davranışını değil. — onaylayan: yusuf

@@ -401,8 +401,14 @@ yazma hızı kabul bandında."* DB kısmı F4b'ye ait; F4a'da ölçülecek olan 
 | Kademe | Hane | Ölçülecek | Kapı |
 |---|---:|---|---|
 | K1 | 10.000 | doğruluk | 18 madde geçiyor |
-| K2 | 500.000 | ölçek davranışı | msj/sn ve RSS, K1'e göre **doğrusal**; uzlaşım ±%0,1 |
+| K2 | 500.000 | ölçek davranışı | **süre ve disk K1'e göre DOĞRUSAL** (hane sayısıyla orantılı büyür); **RSS DOĞRUSAL BÜYÜMEMELİ** — `chunk_size × W` ile sınırlı bir platoda kalmalı (hane sayısıyla büyürse öbekler arası birikme var demektir, bu bir BAŞARISIZLIKTIR); msj/sn K1 ile aynı mertebede kalmalı (öbek başına sabit maliyet, N'e bölünüyor); uzlaşım ±%0,1 |
 | K3 | 8.529.528 | tam popülasyon | uzlaşım ±%0,1; RSS < 4 GB; `null` ve `mqtt` sink'lerde sürdürülen hız ölçüldü |
+
+**K1'in RSS'i taban çizgisi DEĞİL, TEK ÖBEK ölçümüdür** — K1'in hane sayısı (10.000)
+`chunk_size` varsayılanının (50.000) altında kaldığı için öbek döngüsü hiç dönmedi. K2/K3'te
+RSS'in "doğrusal büyümemesi" gerektiği iddiası K1 verisiyle henüz KANITLANMADI — bunu
+kanıtlayan test K2'de, AYNI hane sayısıyla farklı `chunk_size` değerleri karşılaştırılarak
+yapılır (bkz. §5'in K2 ölçüm notu).
 
 **K3'ün özel anlamı:** tam popülasyonda örneklem gürültüsü YOKTUR. Adım 3/3b'nin
 doğrulamalarında toleranslar `√N` ile ölçekleniyordu çünkü örneklem alıyorduk. K3'te
