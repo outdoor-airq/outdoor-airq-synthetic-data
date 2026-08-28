@@ -429,3 +429,42 @@ Claude Code bu dosyaya sadece kullanıcı onayı sonrası satır ekler, sonra co
   **Elektrik bu kademede de KOŞULMADI** — `calibration_electricity.parquet` bu ortamda hâlâ yok. K1'in "doğruluk" kapısı yalnız gaz+katı yakıt için geçildi; elektrik yolu ilk gerçek koşusunu bu ortamda henüz yapmadı.
 
   Tam popülasyonda (8.529.528 hane, K3) örneklem gürültüsü ortadan kalkacağı için madde 11-13 kimlik testine dönüşecek — bu kademe yalnız K1'in doğruluk kapısını kanıtlıyor, K2/K3'ün ölçek davranışını değil. — onaylayan: yusuf
+
+- [2026-08-28] adim4-k2-chunk-size-anlami: K2 kademesi (500.000 hane) sırasında bulunan ve düzeltilen bir mekanizma hatası — MEKANİZMA GERÇEK, ilk gözlemin YORUMU test verisi artefaktıydı, ikisi ayrı kayda geçiyor.
+
+  **Mekanizma (gerçek, düzeltildi):** `pyarrow.dataset.to_batches(filter=..., batch_size=N)`'in `batch_size`'ı FİLTRE ÖNCESİ (ham) satırlara uygulanıyor — filtrelenmiş sonuç `N`'den TAMAMEN BAĞIMSIZ olabilir (0 ile "tüm hedef popülasyon tek öbekte" arasında). Bu, `generate_gas_stream`/`generate_solidfuel_stream`'in `chunk_size` parametresinin isim ve Karar 2'nin bellek gerekçesiyle ("chunk_size × W bellek tavanını belirler") ÇELİŞTİĞİ anlamına geliyordu — parametre aslında "taranan ham satır" demekti, "işlenen hane" değil. Bellek tavanı bu yüzden emtiaya VE coğrafyaya göre (soba oranı ile aynı satırda dağılan/dağılmayan) değişebilirdi; `chunk_size × W` sınırı GÜVENİLİR DEĞİLDİ.
+
+  **Düzeltme:** `src/generate_stream.py::_filtrelenmis_oybekler()` (YENİ) — filtrelenmiş satırları BİRİKTİRİR, `chunk_size`'a ulaşınca bir öbek verir. Ham tarama `_HAM_TARAMA_BATCH_SIZE=100.000` sabit, ayrı bir iç detay. `chunk_size` artık üç emtiada da AYNI anlama geliyor ("işlenen hane sayısı"), bellek tavanı gerçekten sınırlanıyor.
+
+  **Tespit yöntemi ve İLK gözlemin YANLIŞ YORUMU:** İlk K2 koşusunda test verisi `pd.concat([kombi_alt, soba_alt])` ile kurulmuştu — kombi ve soba blok hâlinde AYRIydı (yapay). Bu veriyle katı yakıt akışının ilk 9 öbeği `boyut=0` döndü, 10.'su TÜM 36.626 soba hanesini tek seferde işledi — İLK yorumum "mekanizma hatalı" değil "bu veri hatalı" olabilirdi ama ayrım yapılmadan raporlanmışsa yanıltıcı olurdu. Gerçek `households.parquet` KONTROL EDİLDİ: `isitma_tipi` il içinde KARIŞIK dağılmış (ilk 100.000 satırda 20.867 soba var, bloklar hâlinde değil) — yani gerçek dosyada "boyut=0 öbek" dizisi bu şekilde OLUŞMAZDI. **Ama mekanizmanın kendisi (batch_size ham satırlara uygulanıyor) test verisinden BAĞIMSIZ, HER ZAMAN doğruydu** — yalnız gerçek verideki karışıklık oranı yüksek olduğu için sonucu daha az çarpıcı (ama yine de var olan) bir dengesizlik olarak gösterirdi. İkisi ayrı: **mekanizma kalıcı bir düzeltme gerektiriyordu (yapıldı); "0/hepsi" örüntüsü o turun test verisine özgüydü.**
+
+  K2 ölçümü, düzeltilmiş `chunk_size` semantiği VE gerçek sıralı (karıştırılmamış, il içi sıra korunmuş) test verisiyle baştan koşuluyor — sonuç ayrı girdide. — onaylayan: yusuf
+
+- [2026-08-28] adim4-K2-obek-boyu-cift-kosu: Masterplan §5'in K2 kademesi (500.000 hane) — `chunk_size × W` platosunu KANITLAYAN çift koşu.
+
+  **Örneklem:** 499.999 hane, `households.parquet`'ten İL BAZINDA BİTİŞİK dilimler (il içi kayıt sırası KORUNDU — `pd.concat`/`sample` ile karıştırma yok), il popülasyon payına orantılı. Isıtma tipi dağılımı gerçek dosyanınkiyle aynı karışıklıkta (ilk 50.000 satırda 9.467 soba — bloklar hâlinde değil).
+
+  **Çift koşu — aynı hane sayısı, iki `chunk_size` (W=24, kış penceresi 2025-01-15, düzeltilmiş `_filtrelenmis_oybekler` mekanizmasıyla):**
+
+  | | `chunk_size=50.000` | `chunk_size=25.000` |
+  |---|---:|---:|
+  | Öbek sayısı (gaz) | 8 (7×50.000 + 1.218) | 15 (14×25.000 + 1.218) |
+  | Toplam süre | 463,63 sn | 468,13 sn |
+  | **Tepe RSS** | **2.406,1 MB** | **1.324,8 MB** |
+  | Disk | 227,84 MB | 225,57 MB |
+
+  **Sonuç — K2'nin kapısı GEÇTİ:** süre ve disk `chunk_size`'dan BAĞIMSIZ (≈aynı, %1 fark) — iş hacmi sabit, yalnız öbeklere farklı bölünmüş. Tepe RSS `chunk_size` yarıya inince **%45 düştü** (2.406→1.325 MB) — bu, "bellek `chunk_size`'a bağlı, hane sayısına değil" iddiasının DOĞRUDAN kanıtı. Her iki koşuda da RSS birkaç öbek sonra platoya oturdu, hane sayısıyla (öbek sayısıyla) sınırsız BÜYÜMEDİ (50.000'de öbek 4-7 birebir 2.406,1 MB; 25.000'de öbek 10-13 birebir 1.324,8 MB).
+
+  **Öbek başına süre — karesel büyüme YOK, doğrusal/sabit** (bkz. `adim4-k2-chunk-size-anlami`'nin ilk şüphesi): `chunk_size=50.000` öbekleri 58,9-61,8 sn aralığında, `chunk_size=25.000` öbekleri 28,4-31,2 sn aralığında (yaklaşık yarı boyut → yaklaşık yarı süre) — her iki koşuda da son öbek hariç sabit, sistematik artış trendi yok.
+
+  **K3 tahmini (17,06× — 8.529.528/500.000) — üç bütçe de öngörülebilir, körlemesine girilmeyecek:**
+
+  | | K2 ölçülen (500K) | K3 tahmin (8.529.528) |
+  |---|---:|---:|
+  | Süre | 463,6 sn | ~2,2 saat |
+  | Tepe RSS | 2.406 MB | ~2.406 MB (plato — hane sayısından bağımsız) |
+  | Disk | 227,8 MB | ~3,9 GB |
+
+  Üçü de bütçe içinde: RSS 4 GB tavanının çok altında, disk Karar 3'ün ~8-16 GB tahmininin bile altında. K3'te bu üç sayıdan sapma olursa (özellikle RSS platoyu aşarsa) sapmanın kendisi ayrı bir bulgudur.
+
+  **`validate_generator.py`'ın 18 maddesi bu ölçekte KOŞULMADI — bu, K1/K2 ayrımının doğal sonucu, eksik bir adım değil:** yönerge §5 K1'i "doğruluk" (18 madde), K2'yi "ölçek davranışı" (süre/disk/RSS) için ayırıyor; uzlaşım (madde 11-13) yalnız K3'te (tam popülasyon, örneklem gürültüsü sıfır) anlamlı bir kimlik testine dönüşüyor — K2'de 500.000 hane hâlâ bir örneklem olduğu için bu madde grubu K2'nin KAPSAMINA hiç GİRMİYOR, "atlanmış" değil "buraya ait değil". Yönergenin §5 tablosu bu ayrımı netleştirecek şekilde düzeltildi (aynı commit). — onaylayan: yusuf

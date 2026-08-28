@@ -20,6 +20,7 @@ zaman geriye gitmez — ayrı bir manifest gerekmez.
 Formüller DEĞİŞMEZ — Adım 3/3b'nin doğrulanmış `bulk` fonksiyonları olduğu gibi çağrılır.
 """
 
+import time
 from pathlib import Path
 
 import pandas as pd
@@ -36,6 +37,36 @@ from src.sample_heating_distribution import _expand_daily_to_hourly
 
 def _saat_dosya_adi(saat: pd.Timestamp) -> str:
     return saat.strftime("%Y-%m-%dT%H")
+
+
+# `pyarrow.dataset.to_batches(filter=..., batch_size=N)`'in `batch_size`'ı FİLTRE
+# ÖNCESİ (ham) satırlara uygulanır — filtrelenmiş sonuç N'den bağımsız olabilir (0 ile
+# tüm-öbek arası), bkz. docs/PROGRESS.md `adim4-k2-chunk-size-anlami`. Bu, ham taramanın
+# kendi iç ayrıntısı; `chunk_size`'ın "işlenen hane sayısı" anlamına gelmesi
+# `_filtrelenmis_oybekler` tarafından garanti edilir.
+_HAM_TARAMA_BATCH_SIZE = 100_000
+
+
+def _filtrelenmis_oybekler(dataset: ds.Dataset, kolonlar: list[str], filtre, chunk_size: int):
+    """Filtrelenmiş satırları BİRİKTİRİR, `chunk_size`'a ulaşınca bir öbek olarak verir.
+    Böylece `chunk_size` üç emtiada da AYNI anlama gelir ("işlenen hane sayısı") — hane
+    coğrafi/emtia dağılımından bağımsız, bellek tavanı gerçekten `chunk_size × W` ile
+    sınırlanır."""
+    biriken: list[pd.DataFrame] = []
+    biriken_boyut = 0
+    for ham_batch in dataset.to_batches(columns=kolonlar, filter=filtre, batch_size=_HAM_TARAMA_BATCH_SIZE):
+        if ham_batch.num_rows == 0:
+            continue
+        biriken.append(ham_batch.to_pandas())
+        biriken_boyut += ham_batch.num_rows
+        while biriken_boyut >= chunk_size:
+            birlesik = pd.concat(biriken, ignore_index=True)
+            yield birlesik.iloc[:chunk_size].reset_index(drop=True)
+            kalan = birlesik.iloc[chunk_size:].reset_index(drop=True)
+            biriken = [kalan] if len(kalan) else []
+            biriken_boyut = len(kalan)
+    if biriken_boyut > 0:
+        yield pd.concat(biriken, ignore_index=True)
 
 
 def _hane_meta_ekle(df: pd.DataFrame, ekstra: dict) -> pd.DataFrame:
@@ -85,8 +116,14 @@ class _SaatlikYazicilar:
 def generate_gas_stream(
     households_path: Path, calibration_path: Path, start: pd.Timestamp,
     out_dir: Path, w: int = W_DEFAULT, chunk_size: int = CHUNK_SIZE_DEFAULT,
+    ilerleme_callback=None,
 ) -> list[Path]:
-    """Tam `kombi` popülasyonu için `[start, start+w saat)` bloğu — `stream_gas_*` dosyaları."""
+    """Tam `kombi` popülasyonu için `[start, start+w saat)` bloğu — `stream_gas_*` dosyaları.
+
+    `ilerleme_callback(oybek_no, oybek_boyutu, gecen_toplam_sure_s)` — verilirse her öbek
+    işlendikten sonra çağrılır (K2/K3'ün "öbek başına süre" ölçüm gereksinimi, yönerge §5:
+    "K2'nin asıl çıktısı bu, toplam süre değil" — süre öbek sayısıyla karesel mi doğrusal
+    mı büyüyor, yalnız toplam süreye bakarak ayırt edilemez)."""
     hours = pd.date_range(start, periods=w, freq="h")
     hour_start = hour_index(hours[0])
     gun_araligi = (hours[0].floor("D"), hours[-1].floor("D") + pd.Timedelta(days=1))
@@ -101,8 +138,10 @@ def generate_gas_stream(
     dataset = ds.dataset(households_path)
     yazicilar = _SaatlikYazicilar(out_dir, "gas", hours)
 
-    for batch in dataset.to_batches(columns=kolonlar, filter=ds.field("isitma_tipi") == "kombi", batch_size=chunk_size):
-        chunk_df = batch.to_pandas()
+    _t0 = time.perf_counter()
+    for _oybek_no, chunk_df in enumerate(
+        _filtrelenmis_oybekler(dataset, kolonlar, ds.field("isitma_tipi") == "kombi", chunk_size)
+    ):
         for il_kodu, grup in chunk_df.groupby("il_kodu", observed=True):
             cal_il = cal[cal["il_kodu"] == il_kodu].sort_values("tarih").reset_index(drop=True)
             gaz_dagitim_sirketi = str(cal_il["gaz_dagitim_sirketi"].iloc[0])
@@ -132,6 +171,8 @@ def generate_gas_stream(
             # 49b6e6a). sample_heating_distribution.py::build_gas_sample ile AYNI rename.
             grup_df = grup_df.rename(columns={"h_profil": "shape_factor"})
             yazicilar.ekle(grup_df)
+        if ilerleme_callback is not None:
+            ilerleme_callback(_oybek_no, len(chunk_df), time.perf_counter() - _t0)
 
     return yazicilar.kapat()
 
@@ -139,8 +180,10 @@ def generate_gas_stream(
 def generate_solidfuel_stream(
     households_path: Path, calibration_path: Path, start: pd.Timestamp,
     out_dir: Path, w: int = W_DEFAULT, chunk_size: int = CHUNK_SIZE_DEFAULT,
+    ilerleme_callback=None,
 ) -> list[Path]:
-    """Tam `soba` popülasyonu için `[start, start+w saat)` bloğu — `stream_solidfuel_*`."""
+    """Tam `soba` popülasyonu için `[start, start+w saat)` bloğu — `stream_solidfuel_*`.
+    `ilerleme_callback` — bkz. `generate_gas_stream`."""
     hours = pd.date_range(start, periods=w, freq="h")
     hour_start = hour_index(hours[0])
     gun_araligi = (hours[0].floor("D"), hours[-1].floor("D") + pd.Timedelta(days=1))
@@ -155,8 +198,10 @@ def generate_solidfuel_stream(
     dataset = ds.dataset(households_path)
     yazicilar = _SaatlikYazicilar(out_dir, "solidfuel", hours)
 
-    for batch in dataset.to_batches(columns=kolonlar, filter=ds.field("isitma_tipi") == "soba", batch_size=chunk_size):
-        chunk_df = batch.to_pandas()
+    _t0 = time.perf_counter()
+    for _oybek_no, chunk_df in enumerate(
+        _filtrelenmis_oybekler(dataset, kolonlar, ds.field("isitma_tipi") == "soba", chunk_size)
+    ):
         for il_kodu, grup in chunk_df.groupby("il_kodu", observed=True):
             cal_il = cal[cal["il_kodu"] == il_kodu].sort_values("tarih").reset_index(drop=True)
             acilmis = _expand_daily_to_hourly(
@@ -185,6 +230,8 @@ def generate_solidfuel_stream(
             # ile tutarlı.
             grup_df = grup_df.rename(columns={"hdd": "shape_factor"})
             yazicilar.ekle(grup_df)
+        if ilerleme_callback is not None:
+            ilerleme_callback(_oybek_no, len(chunk_df), time.perf_counter() - _t0)
 
     return yazicilar.kapat()
 

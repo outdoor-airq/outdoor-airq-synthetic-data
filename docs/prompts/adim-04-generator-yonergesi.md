@@ -400,15 +400,16 @@ yazma hızı kabul bandında."* DB kısmı F4b'ye ait; F4a'da ölçülecek olan 
 
 | Kademe | Hane | Ölçülecek | Kapı |
 |---|---:|---|---|
-| K1 | 10.000 | doğruluk | 18 madde geçiyor |
-| K2 | 500.000 | ölçek davranışı | **süre ve disk K1'e göre DOĞRUSAL** (hane sayısıyla orantılı büyür); **RSS DOĞRUSAL BÜYÜMEMELİ** — `chunk_size × W` ile sınırlı bir platoda kalmalı (hane sayısıyla büyürse öbekler arası birikme var demektir, bu bir BAŞARISIZLIKTIR); msj/sn K1 ile aynı mertebede kalmalı (öbek başına sabit maliyet, N'e bölünüyor); uzlaşım ±%0,1 |
-| K3 | 8.529.528 | tam popülasyon | uzlaşım ±%0,1; RSS < 4 GB; `null` ve `mqtt` sink'lerde sürdürülen hız ölçüldü |
+| K1 | 10.000 | doğruluk | 18 madde geçiyor (madde 11-13 ATLANDI — örneklem, uzlaşım burada değerlendirilmez) |
+| K2 | 500.000 | ölçek davranışı | **süre ve disk `chunk_size`'dan BAĞIMSIZ** (hane sayısıyla orantılı büyür, öbekleme şeklinden etkilenmez); **RSS `chunk_size` İLE ÖLÇEKLENİR ve platoya oturur** — `chunk_size × W` ile sınırlı bir platoda kalmalı, hane sayısıyla (öbek sayısıyla) SINIRSIZ BÜYÜMEMELİ (büyürse öbekler arası birikme var demektir, bu bir BAŞARISIZLIKTIR). **Uzlaşım maddesi YOK** — 500.000 hane tam popülasyon (8.529.528) değil, `Σ üretilen ≠ Σ kalibrasyon` yapısal olarak, ±%0,1 burada anlamsız |
+| K3 | 8.529.528 | tam popülasyon | uzlaşım ±%0,1 **kimlik testi**; RSS < 4 GB; `null` ve `mqtt` sink'lerde sürdürülen hız ölçüldü |
 
 **K1'in RSS'i taban çizgisi DEĞİL, TEK ÖBEK ölçümüdür** — K1'in hane sayısı (10.000)
-`chunk_size` varsayılanının (50.000) altında kaldığı için öbek döngüsü hiç dönmedi. K2/K3'te
-RSS'in "doğrusal büyümemesi" gerektiği iddiası K1 verisiyle henüz KANITLANMADI — bunu
-kanıtlayan test K2'de, AYNI hane sayısıyla farklı `chunk_size` değerleri karşılaştırılarak
-yapılır (bkz. §5'in K2 ölçüm notu).
+`chunk_size` varsayılanının (50.000) altında kaldığı için öbek döngüsü hiç dönmedi. K2'nin
+RSS-platosu iddiası K2'nin KENDİ çift-koşusuyla (aynı hane sayısı, iki `chunk_size`)
+kanıtlanmıştır — bkz. `docs/PROGRESS.md` `adim4-K2-obek-boyu-cift-kosu` (2026-08-28):
+`chunk_size` 50.000→25.000'e inince tepe RSS %45 düştü (2.406→1.325 MB), süre/disk
+değişmedi (~aynı) — "bellek `chunk_size`'a bağlı, hane sayısına değil" doğrudan kanıtlandı.
 
 **K3'ün özel anlamı:** tam popülasyonda örneklem gürültüsü YOKTUR. Adım 3/3b'nin
 doğrulamalarında toleranslar `√N` ile ölçekleniyordu çünkü örneklem alıyorduk. K3'te
