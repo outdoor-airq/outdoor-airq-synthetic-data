@@ -18,12 +18,16 @@ import pandas as pd
 import pyarrow.parquet as pq
 
 from config.gas import HEATING_LEVEL_SOURCE_DTYPE, HEATING_SHAPE_SOURCE_DTYPE, TEMP_SOURCE_DTYPE
+from config.epias import LEVEL_SOURCE_DTYPE as ELEC_LEVEL_SOURCE_DTYPE, SHAPE_SOURCE_DTYPE as ELEC_SHAPE_SOURCE_DTYPE
 from config.distribution import hour_index
-from src.generate_stream import generate_gas_stream, generate_solidfuel_stream
+from src.generate_stream import generate_electricity_stream, generate_gas_stream, generate_solidfuel_stream
+from src.household_distribution import distribute_household
 from src.heating_distribution import distribute_gas_household, distribute_solidfuel_household
-from src.payload import dogrula_altin_dosya, gas_payload, solidfuel_payload
+from src.payload import dogrula_altin_dosya, electricity_payload, gas_payload, solidfuel_payload
 from src.publish_stream import _stream_dosyalari, publish_stream
 from src.sinks import NullSink, ParquetSink
+
+_EMTIALAR = ("gas", "solidfuel", "electricity")
 
 
 def _stream_oku(stream_dir: Path, emtia: str) -> pd.DataFrame:
@@ -45,7 +49,7 @@ def dogrula_ndtri_bit_ozdesligi():
     return "GEÇTİ", "Karar 1 commit 2c1cbb6'da kanıtlandı (2 emtia md5 birebir aynı, elektrik ATLANDI) — bkz. PROGRESS.md"
 
 
-def dogrula_skaler_toplu_esdegerligi(stream_dir: Path, gas_cal: pd.DataFrame, sf_cal: pd.DataFrame, n_test=20, seed=42):
+def dogrula_skaler_toplu_esdegerligi(stream_dir: Path, gas_cal: pd.DataFrame, sf_cal: pd.DataFrame, elec_cal: pd.DataFrame | None = None, n_test=20, seed=42):
     """Madde 2 — Adım 3 madde 9 / 3b madde 9 emsali, `ndtri` sonrası."""
     rng = np.random.default_rng(seed)
     sorunlu = []
@@ -90,8 +94,26 @@ def dogrula_skaler_toplu_esdegerligi(stream_dir: Path, gas_cal: pd.DataFrame, sf
             if not np.isclose(tekrar["consumption_kwh"], row["consumption_kwh"], rtol=1e-4, atol=1e-9):
                 sorunlu.append(("solidfuel", row["household_id"], str(row["measured_at"])))
 
+    elec_df = _stream_oku(stream_dir, "electricity")
+    if not elec_df.empty and elec_cal is not None:
+        elec_cal_idx = elec_cal.set_index(["dagitim_sirketi", "measured_at"])
+        idx = rng.choice(len(elec_df), size=min(n_test, len(elec_df)), replace=False)
+        for _, row in elec_df.iloc[idx].iterrows():
+            key = (row["dagitim_sirketi"], row["measured_at"])
+            if key not in elec_cal_idx.index:
+                continue
+            cal_row = elec_cal_idx.loc[key]
+            tekrar = distribute_household(
+                household_id=row["household_id"], dagitim_sirketi=str(row["dagitim_sirketi"]),
+                base_multiplier=float(row["base_multiplier"]), has_ac=bool(row.get("has_ac", False)),
+                measured_at=row["measured_at"], ortalama_hane_kwh=float(cal_row["ortalama_hane_kwh"]),
+                level_source=str(cal_row["level_source"]), shape_source="synthetic_curve",
+            )
+            if not np.isclose(tekrar["consumption_kwh"], row["consumption_kwh"], rtol=1e-4):
+                sorunlu.append(("electricity", row["household_id"], str(row["measured_at"])))
+
     gecti = len(sorunlu) == 0
-    return ("GEÇTİ" if gecti else "FARKLI"), f"test edilen~{2*n_test}, sorunlu={sorunlu[:5]}"
+    return ("GEÇTİ" if gecti else "FARKLI"), f"test edilen~{3*n_test}, sorunlu={sorunlu[:5]}"
 
 
 def dogrula_kosular_arasi_determinizm(households_path, gas_cal_path, start, w, chunk_size, tmp_dir: Path):
@@ -170,7 +192,7 @@ def dogrula_isitma_tipi_tutarliligi(stream_dir: Path):
 
 def dogrula_zaman_sirasi(stream_dir: Path):
     sorunlu_emtialar = []
-    for emtia in ("gas", "solidfuel"):
+    for emtia in _EMTIALAR:
         dosyalar = _stream_dosyalari(stream_dir, emtia)
         if not dosyalar:
             continue
@@ -186,7 +208,7 @@ def dogrula_zaman_sirasi(stream_dir: Path):
 
 def dogrula_tz(stream_dir: Path):
     sorunlu = []
-    for emtia in ("gas", "solidfuel"):
+    for emtia in _EMTIALAR:
         df = _stream_oku(stream_dir, emtia)
         if df.empty:
             continue
@@ -225,17 +247,25 @@ def dogrula_uzlasim(stream_dir: Path, emtia: str, cal: pd.DataFrame, deger_kolon
 
 def dogrula_altin_dosya_kontrolu(stream_dir: Path, tmp_dir: Path):
     sorunlu = []
-    for emtia, topic, donusturucu in [("gas", "energy.gas", gas_payload), ("solidfuel", "energy.solidfuel", solidfuel_payload)]:
+    _DONUSTURUCU = {
+        "gas": ("energy.gas", gas_payload),
+        "solidfuel": ("energy.solidfuel", solidfuel_payload),
+        "electricity": ("energy.electricity", electricity_payload),
+    }
+    test_edilen = []
+    for emtia in _EMTIALAR:
+        topic, donusturucu = _DONUSTURUCU[emtia]
         df = _stream_oku(stream_dir, emtia)
         if df.empty:
             continue
         satir = df.iloc[0].to_dict()
         uretilen = donusturucu(satir)
         gecti, detay = dogrula_altin_dosya(topic, uretilen)
+        test_edilen.append(topic)
         if not gecti:
             sorunlu.append((topic, detay))
     gecti = len(sorunlu) == 0
-    return ("GEÇTİ" if gecti else "FARKLI"), ("gaz + katı yakıt altın dosyayla birebir" if gecti else f"sorunlu={sorunlu}")
+    return ("GEÇTİ" if gecti else "FARKLI"), (f"{', '.join(test_edilen)} altın dosyayla birebir" if gecti else f"sorunlu={sorunlu}")
 
 
 def dogrula_shape_factor_dogrulugu(stream_dir: Path, sf_cal: pd.DataFrame):
@@ -292,16 +322,31 @@ def dogrula_shape_factor_sifir_kurali(stream_dir: Path, yaz_sf_df: pd.DataFrame 
 
 
 def dogrula_provenance(stream_dir: Path):
+    """Gaz/katı yakıt `HEATING_*_SOURCE_DTYPE` + `TEMP_SOURCE_DTYPE` kategorilerini
+    kullanır (`temp_source` kolonu VAR). Elektrik AYRI, kendi `config.epias` kategorilerini
+    kullanır ve `temp_source` kolonu HİÇ YOK (payload'da da yok, §10)."""
     sorunlu = []
-    for emtia in ("gas", "solidfuel"):
-        df = _stream_oku(stream_dir, emtia)
-        if df.empty:
-            continue
-        for kolon, dtype in [
+    _KONTROL_LISTELERI = {
+        "gas": [
             ("level_source", HEATING_LEVEL_SOURCE_DTYPE),
             ("shape_source", HEATING_SHAPE_SOURCE_DTYPE),
             ("temp_source", TEMP_SOURCE_DTYPE),
-        ]:
+        ],
+        "solidfuel": [
+            ("level_source", HEATING_LEVEL_SOURCE_DTYPE),
+            ("shape_source", HEATING_SHAPE_SOURCE_DTYPE),
+            ("temp_source", TEMP_SOURCE_DTYPE),
+        ],
+        "electricity": [
+            ("level_source", ELEC_LEVEL_SOURCE_DTYPE),
+            ("shape_source", ELEC_SHAPE_SOURCE_DTYPE),
+        ],
+    }
+    for emtia in _EMTIALAR:
+        df = _stream_oku(stream_dir, emtia)
+        if df.empty:
+            continue
+        for kolon, dtype in _KONTROL_LISTELERI[emtia]:
             deger = df[kolon].astype(str)
             if deger.isna().any() or (deger == "None").any():
                 sorunlu.append(f"{emtia}.{kolon}: NULL var")
@@ -334,31 +379,44 @@ def dogrula_hiz_ve_bellek(households_path, gas_cal_path, start, w, chunk_size, t
 def validate_all(stream_dir: Path, households_path: Path, gas_cal_path: Path, sf_cal_path: Path,
                   start: pd.Timestamp, w: int, chunk_size: int, beklenen_gas_hane: int,
                   beklenen_sf_hane: int, tam_populasyon: bool, tmp_dir: Path,
-                  yaz_sf_df: pd.DataFrame | None = None) -> list[dict]:
+                  yaz_sf_df: pd.DataFrame | None = None,
+                  elec_cal_path: Path | None = None, beklenen_elec_hane: int | None = None) -> list[dict]:
     gas_cal = pd.read_parquet(gas_cal_path)
     sf_cal = pd.read_parquet(sf_cal_path)
+    elec_cal = pd.read_parquet(elec_cal_path) if elec_cal_path is not None else None
 
     kapsama_gaz = dogrula_tam_kapsama(stream_dir, "gas", beklenen_gas_hane, w)
     kapsama_sf = dogrula_tam_kapsama(stream_dir, "solidfuel", beklenen_sf_hane, w)
-    kapsama_durum = "FARKLI" if "FARKLI" in (kapsama_gaz[0], kapsama_sf[0]) else "GEÇTİ"
+    kapsama_parcalari = [f"gaz: {kapsama_gaz[1]}", f"katı yakıt: {kapsama_sf[1]}"]
+    kapsama_durumlar = [kapsama_gaz[0], kapsama_sf[0]]
+    if elec_cal is not None and beklenen_elec_hane is not None:
+        kapsama_elec = dogrula_tam_kapsama(stream_dir, "electricity", beklenen_elec_hane, w)
+        kapsama_parcalari.append(f"elektrik: {kapsama_elec[1]}")
+        kapsama_durumlar.append(kapsama_elec[0])
+    kapsama_durum = "FARKLI" if "FARKLI" in kapsama_durumlar else "GEÇTİ"
 
-    kontroller = [
-        (1, "ndtri bit-özdeşliği (geçmiş kanıt)", dogrula_ndtri_bit_ozdesligi()),
-        (2, "Skaler/toplu eşdeğerliği", dogrula_skaler_toplu_esdegerligi(stream_dir, gas_cal, sf_cal)),
-        (3, "Koşular arası determinizm", dogrula_kosular_arasi_determinizm(households_path, gas_cal_path, start, w, chunk_size, tmp_dir)),
-        (4, "Öbek sınırı bağımsızlığı", dogrula_obek_siniri_bagimsizligi(households_path, gas_cal_path, start, w, tmp_dir)),
-        (5, "Pencere sınırı bağımsızlığı", dogrula_pencere_siniri_bagimsizligi(households_path, gas_cal_path, start, chunk_size, tmp_dir)),
-        (6, "Tam kapsama (gaz + katı yakıt)", (kapsama_durum, f"gaz: {kapsama_gaz[1]} | katı yakıt: {kapsama_sf[1]}")),
-        (7, "Ayrık kümeler (gaz ∩ katı yakıt = ∅)", dogrula_ayrik_kumeler(stream_dir)),
-        (8, "Isıtma tipi tutarlılığı", dogrula_isitma_tipi_tutarliligi(stream_dir)),
-        (9, "Zaman sırası (measured_at azalmıyor)", dogrula_zaman_sirasi(stream_dir)),
-        (10, "tz (+03:00, naive yok)", dogrula_tz(stream_dir)),
-        (11, "Uzlaşım — elektrik", (None, (
+    if elec_cal is not None:
+        madde11 = dogrula_uzlasim(stream_dir, "electricity", elec_cal, "consumption_kwh", "ortalama_hane_kwh", "hane_sayisi", tam_populasyon)
+    else:
+        madde11 = (None, (
             "ATLANDI — İKİ AYRI sebep üst üste: (1) K1/K2'de örneklem alt kümesi, yönerge §6 "
             "gereği (12/13 ile aynı); (2) calibration_electricity.parquet bu ortamda yok "
             "(madde 14/17 emsali). K3'te (1) düşer, (2) düşmez — elektrik kalibrasyonu bu "
             "ortamda üretilmeden bu madde K3'te de ATLANDI kalır."
-        ))),
+        ))
+
+    kontroller = [
+        (1, "ndtri bit-özdeşliği (geçmiş kanıt)", dogrula_ndtri_bit_ozdesligi()),
+        (2, "Skaler/toplu eşdeğerliği", dogrula_skaler_toplu_esdegerligi(stream_dir, gas_cal, sf_cal, elec_cal)),
+        (3, "Koşular arası determinizm", dogrula_kosular_arasi_determinizm(households_path, gas_cal_path, start, w, chunk_size, tmp_dir)),
+        (4, "Öbek sınırı bağımsızlığı", dogrula_obek_siniri_bagimsizligi(households_path, gas_cal_path, start, w, tmp_dir)),
+        (5, "Pencere sınırı bağımsızlığı", dogrula_pencere_siniri_bagimsizligi(households_path, gas_cal_path, start, chunk_size, tmp_dir)),
+        (6, "Tam kapsama (gaz + katı yakıt + elektrik)", (kapsama_durum, " | ".join(kapsama_parcalari))),
+        (7, "Ayrık kümeler (gaz ∩ katı yakıt = ∅)", dogrula_ayrik_kumeler(stream_dir)),
+        (8, "Isıtma tipi tutarlılığı", dogrula_isitma_tipi_tutarliligi(stream_dir)),
+        (9, "Zaman sırası (measured_at azalmıyor)", dogrula_zaman_sirasi(stream_dir)),
+        (10, "tz (+03:00, naive yok)", dogrula_tz(stream_dir)),
+        (11, "Uzlaşım — elektrik", madde11),
         (12, "Uzlaşım — gaz", dogrula_uzlasim(stream_dir, "gas", gas_cal, "consumption_m3", "gunluk_hane_m3", "kombi_hane", tam_populasyon)),
         (13, "Uzlaşım — katı yakıt", dogrula_uzlasim(stream_dir, "solidfuel", sf_cal, "consumption_kwh", "gunluk_hane_kwh", "soba_hane", tam_populasyon)),
         (14, "Altın dosya", dogrula_altin_dosya_kontrolu(stream_dir, tmp_dir)),
@@ -376,6 +434,7 @@ def main() -> int:
     parser.add_argument("--households-path", required=True, type=Path)
     parser.add_argument("--gas-cal-path", required=True, type=Path)
     parser.add_argument("--sf-cal-path", required=True, type=Path)
+    parser.add_argument("--elec-cal-path", type=Path, default=None, help="verilirse elektrik yolu da üretilir/sınanır")
     parser.add_argument("--start", required=True)
     parser.add_argument("--w", type=int, default=24)
     parser.add_argument("--chunk-size", type=int, default=100)
@@ -396,6 +455,11 @@ def main() -> int:
     generate_gas_stream(args.households_path, args.gas_cal_path, start, stream_dir, w=args.w, chunk_size=args.chunk_size)
     generate_solidfuel_stream(args.households_path, args.sf_cal_path, start, stream_dir, w=args.w, chunk_size=args.chunk_size)
 
+    elec_n = None
+    if args.elec_cal_path is not None:
+        elec_n = ds.dataset(args.households_path).to_table(columns=["household_id"]).num_rows
+        generate_electricity_stream(args.households_path, args.elec_cal_path, start, stream_dir, w=args.w, chunk_size=args.chunk_size)
+
     yaz_sf_df = None
     if args.yaz_start:
         yaz_dir = args.tmp_dir / "yaz_stream"
@@ -409,7 +473,7 @@ def main() -> int:
     sonuclar = validate_all(
         stream_dir, args.households_path, args.gas_cal_path, args.sf_cal_path,
         start, args.w, args.chunk_size, gas_n, sf_n, args.tam_populasyon, args.tmp_dir,
-        yaz_sf_df=yaz_sf_df,
+        yaz_sf_df=yaz_sf_df, elec_cal_path=args.elec_cal_path, beklenen_elec_hane=elec_n,
     )
 
     print("=== Adım 4 doğrulama sonuçları (18 madde) ===")
@@ -422,10 +486,12 @@ def main() -> int:
     atlandi = [s for s in sonuclar if s["durum"] is None]
     print()
     print(f"Toplam: {len(sonuclar)} madde, {len(sonuclar)-len(farkli)-len(atlandi)} GEÇTİ, {len(atlandi)} ATLANDI, {len(farkli)} FARKLI")
-    print(
-        "UYARI: Bu sayım elektriğin bu koşuda hiç test edilmediğini GÖSTERMİYOR — "
-        "calibration_electricity.parquet bu ortamda yok, elektrik yolu (distribute_household_bulk "
-        "üzerinden) hiçbir maddede koşmadı. Yalnız gaz + katı yakıt gerçek veriyle sınandı."
+    if args.elec_cal_path is None:
+        print(
+            "UYARI: Bu sayım elektriğin bu koşuda hiç test edilmediğini GÖSTERMİYOR — "
+            "calibration_electricity.parquet verilmedi (--elec-cal-path), elektrik yolu "
+            "(distribute_household_bulk üzerinden) hiçbir maddede koşmadı. Yalnız gaz + "
+            "katı yakıt gerçek veriyle sınandı."
     )
     return 1 if farkli else 0
 

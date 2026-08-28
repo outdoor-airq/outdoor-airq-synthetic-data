@@ -468,3 +468,13 @@ Claude Code bu dosyaya sadece kullanıcı onayı sonrası satır ekler, sonra co
   Üçü de bütçe içinde: RSS 4 GB tavanının çok altında, disk Karar 3'ün ~8-16 GB tahmininin bile altında. K3'te bu üç sayıdan sapma olursa (özellikle RSS platoyu aşarsa) sapmanın kendisi ayrı bir bulgudur.
 
   **`validate_generator.py`'ın 18 maddesi bu ölçekte KOŞULMADI — bu, K1/K2 ayrımının doğal sonucu, eksik bir adım değil:** yönerge §5 K1'i "doğruluk" (18 madde), K2'yi "ölçek davranışı" (süre/disk/RSS) için ayırıyor; uzlaşım (madde 11-13) yalnız K3'te (tam popülasyon, örneklem gürültüsü sıfır) anlamlı bir kimlik testine dönüşüyor — K2'de 500.000 hane hâlâ bir örneklem olduğu için bu madde grubu K2'nin KAPSAMINA hiç GİRMİYOR, "atlanmış" değil "buraya ait değil". Yönergenin §5 tablosu bu ayrımı netleştirecek şekilde düzeltildi (aynı commit). — onaylayan: yusuf
+
+- [2026-08-28] adim4-elektrik-yolu-ilk-kosu: Elektrik yolu (masterplan §10, `distribute_household_bulk` → `generate_electricity_stream` → `publish_stream` → `electricity_payload`) bu ortamda İLK KEZ çalıştırıldı ve tam 18 madde içinde doğrulandı.
+
+  **Kalibrasyon:** `calibration_electricity.parquet` `EPIAS_MODE=synthetic` ile üretildi (`src/build_calibration.py`, 43.800 satır, 5 bölge × 2025'in tam yılı) — canlı EPİAŞ API'sine ya da `data/epias/` cache'ine bağımlı olmadan, madde 14/17/11'in ATLANDI kalmasının tek nedeni ortadan kaldırıldı.
+
+  **`src/validate_generator.py` elektriğe genişletildi:** madde 2 (skaler/toplu eşdeğerliği), 6 (tam kapsama), 9/10 (zaman sırası/tz), 14 (altın dosya), 17 (provenance, `config.epias`'ın KENDİ `LEVEL_SOURCE_DTYPE`/`SHAPE_SOURCE_DTYPE` kategorileriyle — `HEATING_*` DEĞİL, elektrikte `temp_source` kolonu da YOK) artık elektriği de kapsıyor. Madde 11 (uzlaşım) artık GERÇEK mekanizmayla çalışıp K1'de doğru şekilde ATLANDI dönüyor (önceden yalnız statik bir metin sabitiydi).
+
+  **K1 ölçeğinde (10.000 hane, 11 il, gerçek sıralama) üç emtiayla birden koşuldu: 18 madde — 15 GEÇTİ, 3 ATLANDI, 0 FARKLI.** Elektrik madde 6'da 240.000 satır (10.000×24) tam eşleşti, madde 2'de ~20 rastgele (hane,saat) skaler `distribute_household` ile birebir eşleşti, madde 14'te `energy.electricity` altın dosyayla birebir.
+
+  **Bilinen teknik borç:** `dogrula_uzlasim()` kalibrasyon tablosunda `tarih` (günlük) kolonu bekliyor; elektrik kalibrasyonu `measured_at` (saatlik) kullanıyor — K1/K2'de `tam_populasyon=False` olduğu için fonksiyon bu kod yoluna hiç girmeden erken dönüyor (sorun görünmüyor), ama K3'e geçerken (`tam_populasyon=True`) elektrik için `KeyError` verecek şekilde KIRILACAK. K3'ten önce düzeltilmesi gerekiyor. — onaylayan: yusuf
